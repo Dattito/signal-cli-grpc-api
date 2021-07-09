@@ -23,13 +23,13 @@ Sample `docker-compose.yml`file:
 ```sh
 version: "3"
 services:
-  signal-cli-rest-api:
-    image: bbernhard/signal-cli-rest-api:latest
+  signal-cli-grpc-api:
+    image: dattito/signal-cli-grpc-api:latest
 	environment:
 	  - USE_NATIVE=0
       #- AUTO_RECEIVE_SCHEDULE=0 22 * * * #enable this parameter on demand (see description below)
 	ports:
-      - "8080:8080" #map docker port 8080 to host port 8080.
+      - "9090:9090" #map docker port 9090 to host port 9090.
     volumes:
       - "./signal-cli-config:/home/.local/share/signal-cli" #map "signal-cli-config" folder on host system into docker container. the folder contains the password and cryptographic keys when a new number is registered
 
