@@ -2,16 +2,14 @@ ARG SIGNAL_CLI_VERSION=0.8.4.1
 ARG ZKGROUP_VERSION=0.7.0
 ARG LIBSIGNAL_CLIENT_VERSION=0.8.1
 
-ARG SWAG_VERSION=1.6.7
 ARG GRAALVM_JAVA_VERSION=11
 ARG GRAALVM_VERSION=21.0.0
 
-FROM golang:1.14-buster AS buildcontainer
+FROM golang:1.16-buster AS buildcontainer
 
 ARG SIGNAL_CLI_VERSION
 ARG ZKGROUP_VERSION
 ARG LIBSIGNAL_CLIENT_VERSION
-ARG SWAG_VERSION
 ARG GRAALVM_JAVA_VERSION
 ARG GRAALVM_VERSION
 
@@ -47,14 +45,6 @@ RUN sed -i -e 's/# en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen && \
 ENV PATH="/root/.cargo/bin:${PATH}"
 
 ENV LANG en_US.UTF-8
-
-RUN cd /tmp/ \
-	&& git clone https://github.com/swaggo/swag.git swag-${SWAG_VERSION} \	
-	&& cd swag-${SWAG_VERSION} \
-	&& git checkout v${SWAG_VERSION} \
-	&& make \
-	&& cp /tmp/swag-${SWAG_VERSION}/swag /usr/bin/swag \
-	&& rm -r /tmp/swag-${SWAG_VERSION}
 
 RUN cd /tmp/ \
 	&& git clone https://github.com/AsamK/signal-cli.git signal-cli-${SIGNAL_CLI_VERSION} \
@@ -93,7 +83,7 @@ RUN if [ "$(uname -m)" = "aarch64" ] || [ "$(uname -m)" = "x86_64" ]; then \
 
 # replace zkgroup
 
-RUN ls /tmp/signal-cli-${SIGNAL_CLI_VERSION}/build/install/signal-cli/lib/zkgroup-java-${ZKGROUP_VERSION}.jar || (echo "\n\nzkgroup jar file with version ${ZKGROUP_VERSION} not found. Maybe the version needs to be bumped in the signal-cli-rest-api Dockerfile?\n\n" && echo "Available version: \n" && ls /tmp/signal-cli-${SIGNAL_CLI_VERSION}/build/install/signal-cli/lib/zkgroup-java-* && echo "\n\n" && exit 1)
+RUN ls /tmp/signal-cli-${SIGNAL_CLI_VERSION}/build/install/signal-cli/lib/zkgroup-java-${ZKGROUP_VERSION}.jar || (echo "\n\nzkgroup jar file with version ${ZKGROUP_VERSION} not found. Maybe the version needs to be bumped in the signal-cli-grpc-api Dockerfile?\n\n" && echo "Available version: \n" && ls /tmp/signal-cli-${SIGNAL_CLI_VERSION}/build/install/signal-cli/lib/zkgroup-java-* && echo "\n\n" && exit 1)
 
 RUN cd /tmp/ \
 	&& zip -u /tmp/signal-cli-${SIGNAL_CLI_VERSION}/build/install/signal-cli/lib/zkgroup-java-${ZKGROUP_VERSION}.jar libzkgroup.so 
@@ -109,7 +99,7 @@ RUN cd /tmp/signal-cli-${SIGNAL_CLI_VERSION}/build/distributions/ \
 
 # replace libsignal-client
 
-RUN ls /tmp/signal-cli-${SIGNAL_CLI_VERSION}/build/install/signal-cli/lib/signal-client-java-${LIBSIGNAL_CLIENT_VERSION}.jar || (echo "\n\nsignal-client jar file with version ${LIBSIGNAL_CLIENT_VERSION} not found. Maybe the version needs to be bumped in the signal-cli-rest-api Dockerfile?\n\n" && echo "Available version: \n" && ls /tmp/signal-cli-${SIGNAL_CLI_VERSION}/build/install/signal-cli/lib/signal-client-java-* && echo "\n\n" && exit 1)
+RUN ls /tmp/signal-cli-${SIGNAL_CLI_VERSION}/build/install/signal-cli/lib/signal-client-java-${LIBSIGNAL_CLIENT_VERSION}.jar || (echo "\n\nsignal-client jar file with version ${LIBSIGNAL_CLIENT_VERSION} not found. Maybe the version needs to be bumped in the signal-cli-grpc-api Dockerfile?\n\n" && echo "Available version: \n" && ls /tmp/signal-cli-${SIGNAL_CLI_VERSION}/build/install/signal-cli/lib/signal-client-java-* && echo "\n\n" && exit 1)
 
 RUN cd /tmp/ \
 	&& zip -u /tmp/signal-cli-${SIGNAL_CLI_VERSION}/build/install/signal-cli/lib/signal-client-java-${LIBSIGNAL_CLIENT_VERSION}.jar libsignal_jni.so
@@ -124,13 +114,14 @@ RUN cd /tmp/signal-cli-${SIGNAL_CLI_VERSION}/build/distributions/ \
 	&& tar --owner='' --group='' -rvPf /tmp/signal-cli-${SIGNAL_CLI_VERSION}/build/distributions/signal-cli-${SIGNAL_CLI_VERSION}.tar signal-cli-${SIGNAL_CLI_VERSION}/lib/signal-client-java-${LIBSIGNAL_CLIENT_VERSION}.jar
 
 
-COPY src/api /tmp/signal-cli-rest-api-src/api
-COPY src/utils /tmp/signal-cli-rest-api-src/utils
-COPY src/main.go /tmp/signal-cli-rest-api-src/
-COPY src/go.mod /tmp/signal-cli-rest-api-src/
-COPY src/go.sum /tmp/signal-cli-rest-api-src/
+COPY src/api /tmp/signal-cli-grpc-api-src/api
+COPY src/proto /tmp/signal-cli-grpc-api-src/proto
+COPY src/utils /tmp/signal-cli-grpc-api-src/utils
+COPY src/main.go /tmp/signal-cli-grpc-api-src/
+COPY src/go.mod /tmp/signal-cli-grpc-api-src/
+COPY src/go.sum /tmp/signal-cli-grpc-api-src/
 
-RUN cd /tmp/signal-cli-rest-api-src && swag init && go build
+RUN cd /tmp/signal-cli-grpc-api-src && go build
 
 
 # Start a fresh container for release container
@@ -138,7 +129,7 @@ FROM adoptopenjdk:11-jre-hotspot-bionic
 
 ENV GIN_MODE=release
 
-ENV PORT=8080
+ENV PORT=9090
 
 ARG SIGNAL_CLI_VERSION
 
@@ -146,7 +137,7 @@ RUN apt-get update \
 	&& apt-get install -y --no-install-recommends setpriv \
 	&& rm -rf /var/lib/apt/lists/* 
 
-COPY --from=buildcontainer /tmp/signal-cli-rest-api-src/signal-cli-rest-api /usr/bin/signal-cli-rest-api
+COPY --from=buildcontainer /tmp/signal-cli-grpc-api-src/signal-cli-grpc-api /usr/bin/signal-cli-grpc-api
 COPY --from=buildcontainer /tmp/signal-cli-${SIGNAL_CLI_VERSION}/build/distributions/signal-cli-${SIGNAL_CLI_VERSION}.tar /tmp/signal-cli-${SIGNAL_CLI_VERSION}.tar
 COPY --from=buildcontainer /tmp/signal-cli-${SIGNAL_CLI_VERSION}/build/native-image/signal-cli /tmp/signal-cli-native
 COPY entrypoint.sh /entrypoint.sh
@@ -174,6 +165,3 @@ EXPOSE ${PORT}
 ENV SIGNAL_CLI_CONFIG_DIR=/home/.local/share/signal-cli
 
 ENTRYPOINT ["/entrypoint.sh"]
-
-HEALTHCHECK --interval=20s --timeout=10s --retries=3 \
-    CMD curl -f http://localhost:${PORT}/v1/health || exit 1

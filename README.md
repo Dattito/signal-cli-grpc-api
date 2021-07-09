@@ -1,8 +1,9 @@
-# Dockerized Signal Messenger REST API
+# Dockerized Signal Messenger gRPC API
+This project is forked from [signal-cli-rest-api](https://github.com/datti-to/signal-cli-grpc-api) to create a gRPC based version.
 
-This project creates a small dockerized REST API around [signal-cli](https://github.com/AsamK/signal-cli).
+This project creates a small dockerized gRPC API around [signal-cli](https://github.com/AsamK/signal-cli).
 
-At the moment, the following functionality is exposed via REST:
+At the moment, the following functionality is exposed via gRPC:
 
 - Register a number
 - Verify the number using the code received via SMS
@@ -13,7 +14,7 @@ At the moment, the following functionality is exposed via REST:
 - List/Serve/Delete attachments
 - Update profile
 
-and [many more](https://bbernhard.github.io/signal-cli-rest-api/)
+and many more
 
 ## Examples
 
@@ -36,9 +37,9 @@ services:
 
 ## Auto Receive Schedule
 
-[signal-cli](https://github.com/AsamK/signal-cli), which this REST API wrapper is based on, recommends to call `receive` on a regular basis. So, if you are not already calling the `receive` endpoint regularily, it is recommended to set the `AUTO_RECEIVE_SCHEDULE` parameter in the docker-compose.yml file. The `AUTO_RECEIVE_SCHEDULE` accepts cron schedule expressions and automatically calls the `receive` endpoint at the given time. e.g: `0 22 * * *` calls `receive` daily at 10pm. If you are not familiar with cron schedule expressions, you can use this [website](https://crontab.guru).
+[signal-cli](https://github.com/AsamK/signal-cli), which this gRPC API wrapper is based on, recommends to call `receive` on a regular basis. So, if you are not already calling the `receive` endpoint regularily, it is recommended to set the `AUTO_RECEIVE_SCHEDULE` parameter in the docker-compose.yml file. The `AUTO_RECEIVE_SCHEDULE` accepts cron schedule expressions and automatically calls the `receive` endpoint at the given time. e.g: `0 22 * * *` calls `receive` daily at 10pm. If you are not familiar with cron schedule expressions, you can use this [website](https://crontab.guru).
 
-**WARNING** Calling `receive` will fetch all the messages for the registered Signal number from the Signal Server! So, if you are using the REST API for receiving messages, it's _not_ a good idea to use the `AUTO_RECEIVE_SCHEDULE` parameter, as you might lose some messages that way.
+**WARNING** Calling `receive` will fetch all the messages for the registered Signal number from the Signal Server! So, if you are using the gRPC API for receiving messages, it's _not_ a good idea to use the `AUTO_RECEIVE_SCHEDULE` parameter, as you might lose some messages that way.
 
 
 ## Native Image (EXPERIMENTAL)
@@ -48,17 +49,6 @@ On Systems like the Raspberry Pi, some operations like sending messages can take
 By adding `USE_NATIVE=1` as environmental variable to the `docker-compose.yml` file the native mode will be enabled.
 
 In case there's no native binary available (e.g on a 32 bit Raspian OS), it will fall back to the signal-cli Java application. The native mode only works on a 64bit system, when the native mode is enabled on a 32bit system, it falls back to the Java application.
-
-## Documentation
-
-### API Reference
-
-The Swagger API documentation can be found [here](https://bbernhard.github.io/signal-cli-rest-api/). If you prefer a simple text file based API documentation have a look [here](https://github.com/bbernhard/signal-cli-rest-api/blob/master/doc/EXAMPLES.md).
-
-### Blog Posts
-
-[Running Signal Messenger REST API in Azure Web App for Containers](https://stefanstranger.github.io/2021/06/01/RunningSignalRESTAPIinAppService/) - written by [@stefanstranger](https://github.com/stefanstranger)
-
 
 ## Clients & Libraries
 
