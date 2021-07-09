@@ -1,6 +1,6 @@
 version: "3"
 services:
-  signal-cli-rest-api:
+  signal-cli-grpc-api:
     image: dattito/signal-cli-grpc-api:latest
     environment:
       - USE_NATIVE=0
