@@ -1,4 +1,4 @@
-name: Release Productive Version
+name: Docker (Release Version)
 
 on:
   workflow_dispatch:
