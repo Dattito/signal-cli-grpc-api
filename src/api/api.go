@@ -30,6 +30,38 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
+type GroupEntry struct {
+	Name            string   `json:"name"`
+	Id              string   `json:"id"`
+	InternalId      string   `json:"internal_id"`
+	Members         []string `json:"members"`
+	Blocked         bool     `json:"blocked"`
+	PendingInvites  []string `json:"pending_invites"`
+	PendingRequests []string `json:"pending_requests"`
+	InviteLink      string   `json:"invite_link"`
+}
+
+type GroupPermissions struct {
+	AddMembers string `json:"add_members" enums:"only-admins,every-member"`
+	EditGroup string `json:"edit_group" enums:"only-admins,every-member"`
+}
+
+type CreateGroupRequest struct {
+	Name    string   `json:"name"`
+	Members []string `json:"members"`
+	Description string `json:"description"`
+	Permissions GroupPermissions `json:"permissions"`
+	GroupLinkState string `json:"group_link" enums:"disabled,enabled,enabled-with-approval"`
+}
+
+type LoggingConfiguration struct {
+	Level            string   `json:"Level"`
+}
+
+type Configuration struct {
+	Logging            LoggingConfiguration   `json:"logging"`
+}
+
 type SignalCliGroupEntry struct {
 	Name              string   `json:"name"`
 	Id                string   `json:"id"`
