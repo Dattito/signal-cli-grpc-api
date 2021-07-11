@@ -10,7 +10,7 @@ chown 1000:1000 -R ${SIGNAL_CLI_CONFIG_DIR}
 
 # Show warning on docker exec
 cat <<EOF >> /root/.bashrc
-echo "WARNING: signal-cli-rest-api runs as signal-api (not as root!)" 
+echo "WARNING: signal-cli-grpc-api runs as signal-api (not as root!)" 
 echo "Run 'su signal-api' before using signal-cli!"
 echo "If you want to use signal-cli directly, don't forget to specify the config directory. e.g: \"signal-cli --config ${SIGNAL_CLI_CONFIG_DIR}\""
 EOF
