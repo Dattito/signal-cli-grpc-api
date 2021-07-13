@@ -4,7 +4,7 @@ import "google/protobuf/timestamp.proto";
 import "google/protobuf/empty.proto";
 
 option go_package = "github.com/datti-to/signal-cli-grpc-api/proto";
-//protoc --go_out=. --go_opt=paths=source_relative proto/signal.proto
+//protoc --go_out=. --go_opt=paths=source_relative --go-grpc_out=. --go-grpc_opt=path=source_relative proto/signal.proto
 service SignalService {
     rpc About(google.protobuf.Empty) returns (AboutResponse) {}
     rpc GetConfiguration(google.protobuf.Empty) returns (GetConfigurationResponse) {}
@@ -75,10 +75,16 @@ message ReceiveResponse {
 }
 
 message CreateGroupRequest {
+    message GroupPermissions {
+        string add_members = 1;
+        string edit_group = 2;
+    }
     string number = 1;
     repeated string members = 2;
     string name = 3;
-    
+    string description = 4;
+    GroupPermissions permissions = 5;
+    string group_link = 6;
 }
 
 message CreateGroupResponse {

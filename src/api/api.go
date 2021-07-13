@@ -455,8 +455,36 @@ func (s *SignalService) CreateGroup(ctx context.Context, in *pb.CreateGroupReque
 		return nil, status.Error(codes.InvalidArgument, "Please provide a number")
 	}
 
+	if in.Permissions.AddMembers != "" && !utils.StringInSlice(in.Permissions.AddMembers, []string{"every-member", "only-admins"}) {
+		return nil, status.Error(codes.InvalidArgument, "Invalid edit group permissions provided - only 'every-member' and 'only-admins' allowed!")
+	}
+
+	if in.Permissions.EditGroup != "" && !utils.StringInSlice(in.Permissions.EditGroup, []string{"every-member", "only-admins"}) {
+		return nil, status.Error(codes.InvalidArgument, "Invalid add members permission provided - only 'every-member' and 'only-admins' allowed!")
+	}
+
+	if in.GroupLink != "" && !utils.StringInSlice(in.GroupLink, []string{"enabled", "enabled-with-approval", "disabled"}) {
+		return nil, status.Error(codes.InvalidArgument, "Invalid group link provided - only 'enabled', 'enabled-with-approval' and 'disabled' allowed!")
+	}
+
 	cmd := []string{"--config", s.signalCliConfig, "-u", in.Number, "updateGroup", "-n", in.Name, "-m"}
 	cmd = append(cmd, in.Members...)
+
+	if in.Permissions.AddMembers != "" {
+		cmd = append(cmd, []string{"--set-permissions-add-member", in.Permissions.AddMembers}...)
+	}
+
+	if in.Permissions.EditGroup != "" {
+		cmd = append(cmd, []string{"--set-permission-edit-details", in.Permissions.EditGroup}...)
+	}
+
+	if in.GroupLink != "" {
+		cmd = append(cmd, []string{"--link", in.GroupLink}...)
+	}
+
+	if in.Description != "" {
+		cmd = append(cmd, []string{"--description", in.Description}...)
+	}
 
 	out, err := runSignalCli(true, cmd, "")
 	if err != nil {
