@@ -43,23 +43,23 @@ type GroupEntry struct {
 
 type GroupPermissions struct {
 	AddMembers string `json:"add_members" enums:"only-admins,every-member"`
-	EditGroup string `json:"edit_group" enums:"only-admins,every-member"`
+	EditGroup  string `json:"edit_group" enums:"only-admins,every-member"`
 }
 
 type CreateGroupRequest struct {
-	Name    string   `json:"name"`
-	Members []string `json:"members"`
-	Description string `json:"description"`
-	Permissions GroupPermissions `json:"permissions"`
-	GroupLinkState string `json:"group_link" enums:"disabled,enabled,enabled-with-approval"`
+	Name           string           `json:"name"`
+	Members        []string         `json:"members"`
+	Description    string           `json:"description"`
+	Permissions    GroupPermissions `json:"permissions"`
+	GroupLinkState string           `json:"group_link" enums:"disabled,enabled,enabled-with-approval"`
 }
 
 type LoggingConfiguration struct {
-	Level            string   `json:"Level"`
+	Level string `json:"Level"`
 }
 
 type Configuration struct {
-	Logging            LoggingConfiguration   `json:"logging"`
+	Logging LoggingConfiguration `json:"logging"`
 }
 
 type SignalCliGroupEntry struct {
