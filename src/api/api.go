@@ -15,6 +15,7 @@ import (
 	"strings"
 	"time"
 
+	utils "github.com/bbernhard/signal-cli-rest-api/utils"
 	"github.com/cyphar/filepath-securejoin"
 	"github.com/gabriel-vasile/mimetype"
 	"github.com/gin-gonic/gin"
@@ -22,7 +23,6 @@ import (
 	"github.com/h2non/filetype"
 	log "github.com/sirupsen/logrus"
 	qrcode "github.com/skip2/go-qrcode"
-	utils "github.com/bbernhard/signal-cli-rest-api/utils"
 )
 
 const signalCliV2GroupError = "Cannot create a V2 group as self does not have a versioned profile"
@@ -42,23 +42,23 @@ type GroupEntry struct {
 
 type GroupPermissions struct {
 	AddMembers string `json:"add_members" enums:"only-admins,every-member"`
-	EditGroup string `json:"edit_group" enums:"only-admins,every-member"`
+	EditGroup  string `json:"edit_group" enums:"only-admins,every-member"`
 }
 
 type CreateGroupRequest struct {
-	Name    string   `json:"name"`
-	Members []string `json:"members"`
-	Description string `json:"description"`
-	Permissions GroupPermissions `json:"permissions"`
-	GroupLinkState string `json:"group_link" enums:"disabled,enabled,enabled-with-approval"`
+	Name           string           `json:"name"`
+	Members        []string         `json:"members"`
+	Description    string           `json:"description"`
+	Permissions    GroupPermissions `json:"permissions"`
+	GroupLinkState string           `json:"group_link" enums:"disabled,enabled,enabled-with-approval"`
 }
 
 type LoggingConfiguration struct {
-	Level            string   `json:"Level"`
+	Level string `json:"Level"`
 }
 
 type Configuration struct {
-	Logging            LoggingConfiguration   `json:"logging"`
+	Logging LoggingConfiguration `json:"logging"`
 }
 
 type SignalCliGroupEntry struct {
@@ -347,7 +347,7 @@ func runSignalCli(wait bool, args []string, stdin string) (string, error) {
 	}
 
 	fullCmd := ""
-	if(stdin != "") {
+	if stdin != "" {
 		fullCmd += "echo '" + stdin + "' | "
 	}
 	fullCmd += signalCliBinary + " " + strings.Join(args, " ")
@@ -686,7 +686,7 @@ func (a *Api) CreateGroup(c *gin.Context) {
 	}
 
 	if req.GroupLinkState != "" && !utils.StringInSlice(req.GroupLinkState, []string{"enabled", "enabled-with-approval", "disabled"}) {
-		c.JSON(400, gin.H{"error": "Invalid group link provided - only 'enabled', 'enabled-with-approval' and 'disabled' allowed!" })
+		c.JSON(400, gin.H{"error": "Invalid group link provided - only 'enabled', 'enabled-with-approval' and 'disabled' allowed!"})
 		return
 	}
 
