@@ -18,29 +18,29 @@ COPY ext/libraries/libsignal-client/v${LIBSIGNAL_CLIENT_VERSION} /tmp/libsignal-
 
 # use architecture specific libzkgroup.so
 RUN arch="$(uname -m)"; \
-        case "$arch" in \
-            aarch64) echo "[DEBUG] Using arm64 zkgroup" && cp /tmp/zkgroup-libraries/arm64/libzkgroup.so /tmp/libzkgroup.so ;; \
-			armv7l) echo "[DEBUG] Using armv7 zkgroup" && cp /tmp/zkgroup-libraries/armv7/libzkgroup.so /tmp/libzkgroup.so ;; \
-            x86_64) echo "[DEBUG] Using x86-64 zkgroup" && cp /tmp/zkgroup-libraries/x86-64/libzkgroup.so /tmp/libzkgroup.so ;; \
-			*) echo "Unknown architecture" && exit 1 ;; \
-        esac;
+	case "$arch" in \
+	aarch64) echo "[DEBUG] Using arm64 zkgroup" && cp /tmp/zkgroup-libraries/arm64/libzkgroup.so /tmp/libzkgroup.so ;; \
+	armv7l) echo "[DEBUG] Using armv7 zkgroup" && cp /tmp/zkgroup-libraries/armv7/libzkgroup.so /tmp/libzkgroup.so ;; \
+	x86_64) echo "[DEBUG] Using x86-64 zkgroup" && cp /tmp/zkgroup-libraries/x86-64/libzkgroup.so /tmp/libzkgroup.so ;; \
+	*) echo "Unknown architecture" && exit 1 ;; \
+	esac;
 
 # use architecture specific libsignal_jni.so
 RUN arch="$(uname -m)"; \
-        case "$arch" in \
-            aarch64) cp /tmp/libsignal-client-libraries/arm64/libsignal_jni.so /tmp/libsignal_jni.so ;; \
-			armv7l) cp /tmp/libsignal-client-libraries/armv7/libsignal_jni.so /tmp/libsignal_jni.so ;; \
-            x86_64) cp /tmp/libsignal-client-libraries/x86-64/libsignal_jni.so /tmp/libsignal_jni.so ;; \
-			*) echo "Unknown architecture" && exit 1 ;; \
-        esac;
+	case "$arch" in \
+	aarch64) cp /tmp/libsignal-client-libraries/arm64/libsignal_jni.so /tmp/libsignal_jni.so ;; \
+	armv7l) cp /tmp/libsignal-client-libraries/armv7/libsignal_jni.so /tmp/libsignal_jni.so ;; \
+	x86_64) cp /tmp/libsignal-client-libraries/x86-64/libsignal_jni.so /tmp/libsignal_jni.so ;; \
+	*) echo "Unknown architecture" && exit 1 ;; \
+	esac;
 
 RUN apt-get update \
 	&& apt-get install -y --no-install-recommends wget default-jre software-properties-common git locales zip file build-essential libz-dev zlib1g-dev \
 	&& rm -rf /var/lib/apt/lists/*
 
 RUN sed -i -e 's/# en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen && \
-    dpkg-reconfigure --frontend=noninteractive locales && \
-    update-locale LANG=en_US.UTF-8
+	dpkg-reconfigure --frontend=noninteractive locales && \
+	update-locale LANG=en_US.UTF-8
 
 ENV PATH="/root/.cargo/bin:${PATH}"
 
@@ -59,27 +59,27 @@ RUN cd /tmp/ \
 # build native image with graalvm
 
 RUN arch="$(uname -m)"; \
-        case "$arch" in \
-            aarch64) wget https://github.com/graalvm/graalvm-ce-builds/releases/download/vm-${GRAALVM_VERSION}/graalvm-ce-java${GRAALVM_JAVA_VERSION}-linux-aarch64-${GRAALVM_VERSION}.tar.gz -O /tmp/gvm.tar.gz ;; \
-            armv7l) echo "GRAALVM doesn't support 32bit" ;; \
-            x86_64) wget https://github.com/graalvm/graalvm-ce-builds/releases/download/vm-${GRAALVM_VERSION}/graalvm-ce-java${GRAALVM_JAVA_VERSION}-linux-amd64-${GRAALVM_VERSION}.tar.gz -O /tmp/gvm.tar.gz ;; \
-        esac;
+	case "$arch" in \
+	aarch64) wget https://github.com/graalvm/graalvm-ce-builds/releases/download/vm-${GRAALVM_VERSION}/graalvm-ce-java${GRAALVM_JAVA_VERSION}-linux-aarch64-${GRAALVM_VERSION}.tar.gz -O /tmp/gvm.tar.gz ;; \
+	armv7l) echo "GRAALVM doesn't support 32bit" ;; \
+	x86_64) wget https://github.com/graalvm/graalvm-ce-builds/releases/download/vm-${GRAALVM_VERSION}/graalvm-ce-java${GRAALVM_JAVA_VERSION}-linux-amd64-${GRAALVM_VERSION}.tar.gz -O /tmp/gvm.tar.gz ;; \
+	esac;
 
 RUN if [ "$(uname -m)" = "aarch64" ] || [ "$(uname -m)" = "x86_64" ]; then \
-		cd /tmp && tar xvf gvm.tar.gz \
-		&& export GRAALVM_HOME=/tmp/graalvm-ce-java${GRAALVM_JAVA_VERSION}-${GRAALVM_VERSION} \
-		&& cd /tmp/signal-cli-${SIGNAL_CLI_VERSION} \
-		&& chmod +x /tmp/graalvm-ce-java${GRAALVM_JAVA_VERSION}-${GRAALVM_VERSION}/bin/gu \
-		&& /tmp/graalvm-ce-java${GRAALVM_JAVA_VERSION}-${GRAALVM_VERSION}/bin/gu install native-image \
-		&& ./gradlew assembleNativeImage; \
-    elif [ "$(uname -m)" = "armv7l" ]; then \
-		echo "GRAALVM doesn't support 32bit" \
-		&& echo "Creating temporary file, otherwise the below copy doesn't work for armv7" \
-		&& mkdir -p /tmp/signal-cli-${SIGNAL_CLI_VERSION}/build/native-image \
-		&& touch /tmp/signal-cli-${SIGNAL_CLI_VERSION}/build/native-image/signal-cli; \
-    else \
-		echo "Unknown architecture"; \
-    fi;
+	cd /tmp && tar xvf gvm.tar.gz \
+	&& export GRAALVM_HOME=/tmp/graalvm-ce-java${GRAALVM_JAVA_VERSION}-${GRAALVM_VERSION} \
+	&& cd /tmp/signal-cli-${SIGNAL_CLI_VERSION} \
+	&& chmod +x /tmp/graalvm-ce-java${GRAALVM_JAVA_VERSION}-${GRAALVM_VERSION}/bin/gu \
+	&& /tmp/graalvm-ce-java${GRAALVM_JAVA_VERSION}-${GRAALVM_VERSION}/bin/gu install native-image \
+	&& ./gradlew assembleNativeImage; \
+	elif [ "$(uname -m)" = "armv7l" ]; then \
+	echo "GRAALVM doesn't support 32bit" \
+	&& echo "Creating temporary file, otherwise the below copy doesn't work for armv7" \
+	&& mkdir -p /tmp/signal-cli-${SIGNAL_CLI_VERSION}/build/native-image \
+	&& touch /tmp/signal-cli-${SIGNAL_CLI_VERSION}/build/native-image/signal-cli; \
+	else \
+	echo "Unknown architecture"; \
+	fi;
 
 # replace zkgroup
 
@@ -116,6 +116,7 @@ RUN cd /tmp/signal-cli-${SIGNAL_CLI_VERSION}/build/distributions/ \
 
 COPY src/api /tmp/signal-cli-grpc-api-src/api
 COPY src/proto /tmp/signal-cli-grpc-api-src/proto
+COPY src/client /tmp/signal-cli-grpc-api-src/client
 COPY src/utils /tmp/signal-cli-grpc-api-src/utils
 COPY src/main.go /tmp/signal-cli-grpc-api-src/
 COPY src/go.mod /tmp/signal-cli-grpc-api-src/
@@ -156,9 +157,9 @@ RUN groupadd -g 1000 signal-api \
 
 # remove the temporary created signal-cli-native on armv7, as GRAALVM doesn't support 32bit
 RUN arch="$(uname -m)"; \
-        case "$arch" in \
-            armv7l) echo "GRAALVM doesn't support 32bit" && rm /opt/signal-cli-${SIGNAL_CLI_VERSION}/bin/signal-cli-native /usr/bin/signal-cli-native  ;; \
-        esac;
+	case "$arch" in \
+	armv7l) echo "GRAALVM doesn't support 32bit" && rm /opt/signal-cli-${SIGNAL_CLI_VERSION}/bin/signal-cli-native /usr/bin/signal-cli-native  ;; \
+	esac;
 
 EXPOSE ${PORT}
 
