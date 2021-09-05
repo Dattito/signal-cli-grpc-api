@@ -147,7 +147,7 @@ func getContainerId() (string, error) {
 	}
 	lines := strings.Split(string(data), "\n")
 	if len(lines) == 0 {
-		return "", errors.New("Couldn't get docker container id (empty)")
+		return "", errors.New("couldn't get docker container id (empty)")
 	}
 	containerId := strings.Replace(lines[0], "/docker/", "", -1)
 	return containerId, nil
@@ -159,19 +159,19 @@ func send(attachmentTmpDir string, signalCliConfig string, number string, messag
 	cmd := []string{"--config", signalCliConfig, "-u", number, "send"}
 
 	if len(recipients) == 0 {
-		return "", errors.New("Please specify at least one recipient")
+		return "", errors.New("please specify at least one recipient")
 	}
 
 	if !isGroup {
 		cmd = append(cmd, recipients...)
 	} else {
 		if len(recipients) > 1 {
-			return "", errors.New("More than one recipient is currently not allowed")
+			return "", errors.New("more than one recipient is currently not allowed")
 		}
 
 		groupId, err := base64.StdEncoding.DecodeString(recipients[0])
 		if err != nil {
-			return "", errors.New("Invalid group id")
+			return "", errors.New("invalid group id")
 		}
 
 		cmd = append(cmd, []string{"-g", string(groupId)}...)
@@ -221,7 +221,7 @@ func send(attachmentTmpDir string, signalCliConfig string, number string, messag
 	if err != nil {
 		cleanupTmpFiles(attachmentTmpPaths)
 		if strings.Contains(err.Error(), signalCliV2GroupError) {
-			return "", errors.New("Cannot send message to group - please first update your profile.")
+			return "", errors.New("cannot send message to group - please first update your profile")
 		}
 		return "", err
 	}
@@ -316,7 +316,7 @@ func ConvertGroupIdToInternalGroupId(id string) (string, error) {
 	groupIdWithoutPrefix := strings.TrimPrefix(id, groupPrefix)
 	internalGroupId, err := base64.StdEncoding.DecodeString(groupIdWithoutPrefix)
 	if err != nil {
-		return "", errors.New("Invalid group id")
+		return "", errors.New("invalid group id")
 	}
 
 	return string(internalGroupId), err
@@ -374,11 +374,11 @@ func (s *SignalClient) SendV1(number string, message string, recipients []string
 
 func (s *SignalClient) SendV2(number string, message string, recps []string, base64Attachments []string) ([]string, error) {
 	if len(recps) == 0 {
-		return []string{}, errors.New("Please provide at least one recipient")
+		return []string{}, errors.New("please provide at least one recipient")
 	}
 
 	if number == "" {
-		return []string{}, errors.New("Please provide a valid number")
+		return []string{}, errors.New("please provide a valid number")
 	}
 
 	groups := []string{}
@@ -393,11 +393,11 @@ func (s *SignalClient) SendV2(number string, message string, recps []string, bas
 	}
 
 	if len(recipients) > 0 && len(groups) > 0 {
-		return []string{}, errors.New("Signal Messenger Groups and phone numbers cannot be specified together in one request! Please split them up into multiple REST API calls.")
+		return []string{}, errors.New("signal Messenger Groups and phone numbers cannot be specified together in one request! Please split them up into multiple REST API calls")
 	}
 
 	if len(groups) > 1 {
-		return []string{}, errors.New("A signal message cannot be sent to more than one group at once! Please use multiple REST API calls for that.")
+		return []string{}, errors.New("a signal message cannot be sent to more than one group at once! Please use multiple REST API calls for that")
 	}
 
 	timestamps := []string{}
@@ -466,7 +466,7 @@ func (s *SignalClient) CreateGroup(number string, name string, members []string,
 	out, err := runSignalCli(true, cmd, "")
 	if err != nil {
 		if strings.Contains(err.Error(), signalCliV2GroupError) {
-			return "", errors.New("Cannot create group - please first update your profile.")
+			return "", errors.New("cannot create group - please first update your profile")
 		}
 		return "", err
 	}
