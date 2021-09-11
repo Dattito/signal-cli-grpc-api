@@ -37,7 +37,12 @@ func main() {
 		log.Fatal("Couldn't set env variable: ", err.Error())
 	}
 
-	signalClient := client.NewSignalClient(*signalCliConfig, *attachmentTmpDir, *avatarTmpDir)
+	jsonRpc2ClientConfigPathPath := *signalCliConfig + "/jsonrpc2.yml"
+	signalClient := client.NewSignalClient(*signalCliConfig, *attachmentTmpDir, *avatarTmpDir, client.JsonRpc, jsonRpc2ClientConfigPathPath)
+	err = signalClient.Init()
+	if err != nil {
+		log.Fatal("Couldn't init Signal Client: ", err.Error())
+	}
 
 	signalService := api.NewSignalService(signalClient)
 
