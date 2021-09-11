@@ -26,7 +26,7 @@ services:
   signal-cli-grpc-api:
     image: dattito/signal-cli-grpc-api:latest
 	environment:
-	  - USE_NATIVE=0
+	  - MODE=normal #supported modes: json-rpc, native, normal
       #- AUTO_RECEIVE_SCHEDULE=0 22 * * * #enable this parameter on demand (see description below)
 	ports:
       - "9090:9090" #map docker port 9090 to host port 9090.
