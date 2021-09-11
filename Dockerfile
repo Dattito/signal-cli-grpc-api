@@ -1,6 +1,6 @@
 ARG SIGNAL_CLI_VERSION=0.8.5
 ARG ZKGROUP_VERSION=0.7.0
-ARG LIBSIGNAL_CLIENT_VERSION=0.8.1
+ARG LIBSIGNAL_CLIENT_VERSION=0.9.0
 
 ARG GRAALVM_JAVA_VERSION=11
 ARG GRAALVM_VERSION=21.0.0
@@ -118,11 +118,15 @@ COPY src/api /tmp/signal-cli-grpc-api-src/api
 COPY src/proto /tmp/signal-cli-grpc-api-src/proto
 COPY src/client /tmp/signal-cli-grpc-api-src/client
 COPY src/utils /tmp/signal-cli-grpc-api-src/utils
+COPY src/scripts /tmp/signal-cli-grpc-api-src/scripts
 COPY src/main.go /tmp/signal-cli-grpc-api-src/
 COPY src/go.mod /tmp/signal-cli-grpc-api-src/
 COPY src/go.sum /tmp/signal-cli-grpc-api-src/
 
 RUN cd /tmp/signal-cli-grpc-api-src && go build
+
+# build supervisorctl_config_creator
+RUN cd /tmp/signal-cli-rest-api-src/scripts && go build -o jsonrpc2-helper 
 
 
 # Start a fresh container for release container
@@ -135,16 +139,20 @@ ENV PORT=9090
 ARG SIGNAL_CLI_VERSION
 
 RUN apt-get update \
-	&& apt-get install -y --no-install-recommends setpriv \
-	&& rm -rf /var/lib/apt/lists/*
+	&& apt-get install -y --no-install-recommends setpriv supervisor netcat \
+	&& rm -rf /var/lib/apt/lists/* 
 
 COPY --from=buildcontainer /tmp/signal-cli-grpc-api-src/signal-cli-grpc-api /usr/bin/signal-cli-grpc-api
 COPY --from=buildcontainer /tmp/signal-cli-${SIGNAL_CLI_VERSION}/build/distributions/signal-cli-${SIGNAL_CLI_VERSION}.tar /tmp/signal-cli-${SIGNAL_CLI_VERSION}.tar
 COPY --from=buildcontainer /tmp/signal-cli-${SIGNAL_CLI_VERSION}/build/native-image/signal-cli /tmp/signal-cli-native
+COPY --from=buildcontainer /tmp/signal-cli-rest-api-src/scripts/jsonrpc2-helper /usr/bin/jsonrpc2-helper
 COPY entrypoint.sh /entrypoint.sh
+#COPY conf/supervisor/signal-cli.conf /etc/supervisor/conf.d/
 
 RUN tar xf /tmp/signal-cli-${SIGNAL_CLI_VERSION}.tar -C /opt
 RUN rm -rf /tmp/signal-cli-${SIGNAL_CLI_VERSION}.tar
+
+#RUN mkdir -p /var/log/signal-cli
 
 RUN groupadd -g 1000 signal-api \
 	&& useradd --no-log-init -M -d /home -s /bin/bash -u 1000 -g 1000 signal-api \
