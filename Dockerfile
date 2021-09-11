@@ -49,7 +49,7 @@ ENV LANG en_US.UTF-8
 RUN cd /tmp/ \
 	&& git clone https://github.com/AsamK/signal-cli.git signal-cli-${SIGNAL_CLI_VERSION} \
 	&& cd signal-cli-${SIGNAL_CLI_VERSION} \
-	&& git checkout v${SIGNAL_CLI_VERSION} \
+	#&& git checkout v${SIGNAL_CLI_VERSION} \
 	&& cp /tmp/libzkgroup.so ./lib/src/main/resources/libzkgroup.so \
 	&& cp /tmp/libsignal_jni.so ./lib/src/main/resources/libsignal_jni.so \
 	&& ./gradlew build \
@@ -147,12 +147,9 @@ COPY --from=buildcontainer /tmp/signal-cli-${SIGNAL_CLI_VERSION}/build/distribut
 COPY --from=buildcontainer /tmp/signal-cli-${SIGNAL_CLI_VERSION}/build/native-image/signal-cli /tmp/signal-cli-native
 COPY --from=buildcontainer /tmp/signal-cli-rest-api-src/scripts/jsonrpc2-helper /usr/bin/jsonrpc2-helper
 COPY entrypoint.sh /entrypoint.sh
-#COPY conf/supervisor/signal-cli.conf /etc/supervisor/conf.d/
 
 RUN tar xf /tmp/signal-cli-${SIGNAL_CLI_VERSION}.tar -C /opt
 RUN rm -rf /tmp/signal-cli-${SIGNAL_CLI_VERSION}.tar
-
-#RUN mkdir -p /var/log/signal-cli
 
 RUN groupadd -g 1000 signal-api \
 	&& useradd --no-log-init -M -d /home -s /bin/bash -u 1000 -g 1000 signal-api \
