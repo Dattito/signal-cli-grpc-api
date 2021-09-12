@@ -3,8 +3,6 @@ package api
 import (
 	"context"
 	"encoding/json"
-	"errors"
-	"strconv"
 
 	"github.com/datti-to/signal-cli-grpc-api/client"
 	pb "github.com/datti-to/signal-cli-grpc-api/proto"
@@ -94,14 +92,9 @@ func (s *SignalService) Send(ctx context.Context, in *pb.SendRequest) (*pb.SendR
 		return nil, err
 	}
 
-	i_timestamp, err := strconv.Atoi(timestamp)
-	if err != nil {
-		return nil, errors.New("couldn't convert timestamp to int")
-	}
-
 	return &pb.SendResponse{
 		Timestamp: &timestamppb.Timestamp{
-			Seconds: int64(i_timestamp),
+			Seconds: timestamp.Timestamp,
 		},
 	}, nil
 }
@@ -120,14 +113,9 @@ func (s *SignalService) SendV2(ctx context.Context, in *pb.SendV2Request) (*pb.S
 		return nil, err
 	}
 
-	i_timestamp, err := strconv.Atoi(timestamp[0])
-	if err != nil {
-		return nil, errors.New("couldn't convert timestamp to int")
-	}
-
 	return &pb.SendResponse{
 		Timestamp: &timestamppb.Timestamp{
-			Seconds: int64(i_timestamp),
+			Seconds: (*timestamp)[0].Timestamp,
 		},
 	}, nil
 }
