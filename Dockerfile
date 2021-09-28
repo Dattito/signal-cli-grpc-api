@@ -142,7 +142,7 @@ ENV PORT=9090
 ARG SIGNAL_CLI_VERSION
 
 RUN apt-get update \
-	&& apt-get install -y --no-install-recommends setpriv supervisor netcat \
+	&& apt-get install -y --no-install-recommends util-linux supervisor netcat \
 	&& rm -rf /var/lib/apt/lists/* 
 
 COPY --from=buildcontainer /tmp/signal-cli-grpc-api-src/signal-cli-grpc-api /usr/bin/signal-cli-grpc-api
