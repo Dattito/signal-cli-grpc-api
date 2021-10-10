@@ -34,6 +34,7 @@ numprocs=1
 
 func main() {
 	signalCliConfigDir := flag.String("signal-cli-config-dir", "/home/.local/share/signal-cli/", "Path to signal-cli config directory")
+	signalCliConfigDataDir := *signalCliConfigDir + "data"
 
 	jsonRpc2ClientConfig := utils.NewJsonRpc2ClientConfig()
 
@@ -41,9 +42,16 @@ func main() {
 	fifoBasePathName := "/tmp/sigsocket"
 	var ctr int64 = 0
 
-	filepath.Walk(*signalCliConfigDir, func(path string, info os.FileInfo, err error) error {
-		filename := filepath.Base(path)
-		if strings.HasPrefix(filename, "+") && info.Mode().IsRegular() {
+	items, err := ioutil.ReadDir(signalCliConfigDataDir)
+	if err != nil {
+		log.Fatal("Couldn't read contents of ", signalCliConfigDataDir)
+	}
+	for _, item := range items {
+		if item.IsDir() {
+			continue
+		}
+		filename := filepath.Base(item.Name())
+		if strings.HasPrefix(filename, "+") {
 			if utils.IsPhoneNumber(filename) {
 				number := filename
 				fifoPathname := fifoBasePathName + strconv.FormatInt(ctr, 10)
@@ -84,11 +92,10 @@ func main() {
 				log.Error("Skipping ", filename, " as it is not a valid phone number!")
 			}
 		}
-		return nil
-	})
+	}
 
 	// write jsonrpc.yml config file
-	err := jsonRpc2ClientConfig.Persist(*signalCliConfigDir + "jsonrpc2.yml")
+	err = jsonRpc2ClientConfig.Persist(*signalCliConfigDir + "jsonrpc2.yml")
 	if err != nil {
 		log.Fatal("Couldn't persist jsonrpc2.yaml: ", err.Error())
 	}
