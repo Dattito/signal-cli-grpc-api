@@ -16,7 +16,41 @@ At the moment, the following functionality is exposed via gRPC:
 
 and many more
 
-## Examples
+## Modes
+
+The `signal-cli-rest-api` supports three different modes:
+
+* Normal Mode: In normal mode, the `signal-cli` executable is invoked for every REST API request. As `signal-cli` is a Java application, a significant amount of time is spent in the JVM (Java Virtual Machine) startup - which makes this mode pretty slow.
+* Native Mode: Instead of calling a Java executable for every REST API request, a native image (compiled with GraalVM) is called. This mode therefore usually performs better than the normal mode. 
+* JSON-RPC Mode: In JSON-RPC mode, a single `signal-cli` instance is spawned in daemon mode. The communication happens via JSON-RPC. This mode is usually the fastest.
+
+
+| architecture | normal mode | native mode | json-rpc mode |
+|--------------|:-----------:|:-----------:|---------------|
+|    x86-64    |      ✅     |     ✅      |       ✅      |
+|    armv7     |      ✅     |     ❌ <sup>1</sup>     |       ✅      |
+|    arm64     |      ✅     |     ✅      |       ✅      |
+
+
+|     mode     | speed       |
+|-------------:|:------------|
+|    json-rpc  |    ✅ ✅ ✅ |
+|    native    |    ✅ ✅    |
+|    normal    |    ✅       |
+
+
+Notes:
+1. If the signal-cli-rest-api docker container is started on an armv7 system in native mode, it automatically falls back to the normal mode.
+
+## Auto Receive Schedule
+
+> :warning: This setting is only needed in normal/native mode!
+
+[signal-cli](https://github.com/AsamK/signal-cli), which this REST API wrapper is based on, recommends to call `receive` on a regular basis. So, if you are not already calling the `receive` endpoint regularily, it is recommended to set the `AUTO_RECEIVE_SCHEDULE` parameter in the docker-compose.yml file. The `AUTO_RECEIVE_SCHEDULE` accepts cron schedule expressions and automatically calls the `receive` endpoint at the given time. e.g: `0 22 * * *` calls `receive` daily at 10pm. If you are not familiar with cron schedule expressions, you can use this [website](https://crontab.guru).
+
+**WARNING** Calling `receive` will fetch all the messages for the registered Signal number from the Signal Server! So, if you are using the REST API for receiving messages, it's _not_ a good idea to use the `AUTO_RECEIVE_SCHEDULE` parameter, as you might lose some messages that way.
+
+## Example
 
 Sample `docker-compose.yml`file:
 
@@ -35,20 +69,16 @@ services:
 
 ```
 
-## Auto Receive Schedule
+## Documentation
 
-[signal-cli](https://github.com/AsamK/signal-cli), which this gRPC API wrapper is based on, recommends to call `receive` on a regular basis. So, if you are not already calling the `receive` endpoint regularily, it is recommended to set the `AUTO_RECEIVE_SCHEDULE` parameter in the docker-compose.yml file. The `AUTO_RECEIVE_SCHEDULE` accepts cron schedule expressions and automatically calls the `receive` endpoint at the given time. e.g: `0 22 * * *` calls `receive` daily at 10pm. If you are not familiar with cron schedule expressions, you can use this [website](https://crontab.guru).
+### API Reference
 
-**WARNING** Calling `receive` will fetch all the messages for the registered Signal number from the Signal Server! So, if you are using the gRPC API for receiving messages, it's _not_ a good idea to use the `AUTO_RECEIVE_SCHEDULE` parameter, as you might lose some messages that way.
+The Swagger API documentation can be found [here](https://bbernhard.github.io/signal-cli-rest-api/). If you prefer a simple text file based API documentation have a look [here](https://github.com/bbernhard/signal-cli-rest-api/blob/master/doc/EXAMPLES.md).
 
+### Blog Posts
 
-## Native Image (EXPERIMENTAL)
+[Running Signal Messenger REST API in Azure Web App for Containers](https://stefanstranger.github.io/2021/06/01/RunningSignalRESTAPIinAppService/) - written by [@stefanstranger](https://github.com/stefanstranger)
 
-On Systems like the Raspberry Pi, some operations like sending messages can take quite a while. That's because signal-cli is a Java application and a significant amount of time is spent in the JVM (Java Virtual Machine) startup. signal-cli recently added the possibility to compile the Java application to a native binary (done via GraalVM).
-
-By adding `USE_NATIVE=1` as environmental variable to the `docker-compose.yml` file the native mode will be enabled.
-
-In case there's no native binary available (e.g on a 32 bit Raspian OS), it will fall back to the signal-cli Java application. The native mode only works on a 64bit system, when the native mode is enabled on a 32bit system, it falls back to the Java application.
 
 ## Clients & Libraries
 
