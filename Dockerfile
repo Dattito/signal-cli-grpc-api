@@ -125,11 +125,7 @@ COPY src/go.sum /tmp/signal-cli-grpc-api-src/
 
 RUN cd /tmp/signal-cli-grpc-api-src && go build
 
-# build supervisorctl_config_creator
-RUN cd /tmp/signal-cli-rest-api-src/scripts && go build -o jsonrpc2-helper 
-
-# build supervisorctl_config_creator
-RUN cd /tmp/signal-cli-rest-api-src/scripts && go build -o jsonrpc2-helper 
+RUN cd /tmp/signal-cli-grpc-api-src/scripts && go build -o jsonrpc2-helper 
 
 
 # Start a fresh container for release container
@@ -148,7 +144,7 @@ RUN apt-get update \
 COPY --from=buildcontainer /tmp/signal-cli-grpc-api-src/signal-cli-grpc-api /usr/bin/signal-cli-grpc-api
 COPY --from=buildcontainer /tmp/signal-cli-${SIGNAL_CLI_VERSION}/build/distributions/signal-cli-${SIGNAL_CLI_VERSION}.tar /tmp/signal-cli-${SIGNAL_CLI_VERSION}.tar
 COPY --from=buildcontainer /tmp/signal-cli-${SIGNAL_CLI_VERSION}/build/native-image/signal-cli /tmp/signal-cli-native
-COPY --from=buildcontainer /tmp/signal-cli-rest-api-src/scripts/jsonrpc2-helper /usr/bin/jsonrpc2-helper
+COPY --from=buildcontainer /tmp/signal-cli-grpc-api-src/scripts/jsonrpc2-helper /usr/bin/jsonrpc2-helper
 COPY entrypoint.sh /entrypoint.sh
 
 RUN tar xf /tmp/signal-cli-${SIGNAL_CLI_VERSION}.tar -C /opt
