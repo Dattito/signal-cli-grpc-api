@@ -4,7 +4,7 @@ import "google/protobuf/timestamp.proto";
 import "google/protobuf/empty.proto";
 
 option go_package = "github.com/datti-to/signal-cli-grpc-api/proto";
-//protoc --go_out=. --go_opt=paths=source_relative --go-grpc_out=. --go-grpc_opt=path=source_relative proto/signal.proto
+//protoc --go_out=. --go_opt=paths=source_relative --go-grpc_out=. --go-grpc_opt=paths=source_relative proto/signal.proto
 service SignalService {
     rpc About(google.protobuf.Empty) returns (AboutResponse) {}
     rpc GetConfiguration(google.protobuf.Empty) returns (GetConfigurationResponse) {}
@@ -17,7 +17,9 @@ service SignalService {
     rpc CreateGroup(CreateGroupRequest) returns (CreateGroupResponse) {}
     rpc GetGroups(GetGroupsRequest) returns (GetGroupsResponse) {}
     rpc GetGroup(GroupRequest) returns (GetGroupResponse) {}
-    rpc GroupAction(GroupActionRequest) returns (google.protobuf.Empty) {}
+    rpc DeleteGroup(GroupRequest) returns (google.protobuf.Empty) {}
+    rpc JoinGroup(GroupRequest) returns (google.protobuf.Empty) {}
+    rpc BlockGroup(GroupRequest) returns (google.protobuf.Empty) {}
     rpc GetQrCodeLink(GetQrCodeLinkRequest) returns (GetQrCodeLinkResponse) {}
     rpc GetAttachments(google.protobuf.Empty) returns (GetAttachmentsResponse) {}
     rpc RemoveAttachment(RemoveAttachmentRequest) returns (google.protobuf.Empty) {}
@@ -30,7 +32,7 @@ service SignalService {
 
 message AboutResponse {
     int32 build = 1;
-    repeated string versions = 2;
+    repeated string supported_api_versions = 2;
 }
 
 message Logging {
@@ -67,7 +69,7 @@ message SendRequest {
 
 message ReceiveRequest {
     string number = 1;
-    string timeout = 2;
+    int32 timeout = 2;
 }
 
 message ReceiveResponse {

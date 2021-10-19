@@ -30,7 +30,9 @@ type SignalServiceClient interface {
 	CreateGroup(ctx context.Context, in *CreateGroupRequest, opts ...grpc.CallOption) (*CreateGroupResponse, error)
 	GetGroups(ctx context.Context, in *GetGroupsRequest, opts ...grpc.CallOption) (*GetGroupsResponse, error)
 	GetGroup(ctx context.Context, in *GroupRequest, opts ...grpc.CallOption) (*GetGroupResponse, error)
-	GroupAction(ctx context.Context, in *GroupActionRequest, opts ...grpc.CallOption) (*empty.Empty, error)
+	DeleteGroup(ctx context.Context, in *GroupRequest, opts ...grpc.CallOption) (*empty.Empty, error)
+	JoinGroup(ctx context.Context, in *GroupRequest, opts ...grpc.CallOption) (*empty.Empty, error)
+	BlockGroup(ctx context.Context, in *GroupRequest, opts ...grpc.CallOption) (*empty.Empty, error)
 	GetQrCodeLink(ctx context.Context, in *GetQrCodeLinkRequest, opts ...grpc.CallOption) (*GetQrCodeLinkResponse, error)
 	GetAttachments(ctx context.Context, in *empty.Empty, opts ...grpc.CallOption) (*GetAttachmentsResponse, error)
 	RemoveAttachment(ctx context.Context, in *RemoveAttachmentRequest, opts ...grpc.CallOption) (*empty.Empty, error)
@@ -148,9 +150,27 @@ func (c *signalServiceClient) GetGroup(ctx context.Context, in *GroupRequest, op
 	return out, nil
 }
 
-func (c *signalServiceClient) GroupAction(ctx context.Context, in *GroupActionRequest, opts ...grpc.CallOption) (*empty.Empty, error) {
+func (c *signalServiceClient) DeleteGroup(ctx context.Context, in *GroupRequest, opts ...grpc.CallOption) (*empty.Empty, error) {
 	out := new(empty.Empty)
-	err := c.cc.Invoke(ctx, "/SignalService/GroupAction", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/SignalService/DeleteGroup", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *signalServiceClient) JoinGroup(ctx context.Context, in *GroupRequest, opts ...grpc.CallOption) (*empty.Empty, error) {
+	out := new(empty.Empty)
+	err := c.cc.Invoke(ctx, "/SignalService/JoinGroup", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *signalServiceClient) BlockGroup(ctx context.Context, in *GroupRequest, opts ...grpc.CallOption) (*empty.Empty, error) {
+	out := new(empty.Empty)
+	err := c.cc.Invoke(ctx, "/SignalService/BlockGroup", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -244,7 +264,9 @@ type SignalServiceServer interface {
 	CreateGroup(context.Context, *CreateGroupRequest) (*CreateGroupResponse, error)
 	GetGroups(context.Context, *GetGroupsRequest) (*GetGroupsResponse, error)
 	GetGroup(context.Context, *GroupRequest) (*GetGroupResponse, error)
-	GroupAction(context.Context, *GroupActionRequest) (*empty.Empty, error)
+	DeleteGroup(context.Context, *GroupRequest) (*empty.Empty, error)
+	JoinGroup(context.Context, *GroupRequest) (*empty.Empty, error)
+	BlockGroup(context.Context, *GroupRequest) (*empty.Empty, error)
 	GetQrCodeLink(context.Context, *GetQrCodeLinkRequest) (*GetQrCodeLinkResponse, error)
 	GetAttachments(context.Context, *empty.Empty) (*GetAttachmentsResponse, error)
 	RemoveAttachment(context.Context, *RemoveAttachmentRequest) (*empty.Empty, error)
@@ -293,8 +315,14 @@ func (UnimplementedSignalServiceServer) GetGroups(context.Context, *GetGroupsReq
 func (UnimplementedSignalServiceServer) GetGroup(context.Context, *GroupRequest) (*GetGroupResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetGroup not implemented")
 }
-func (UnimplementedSignalServiceServer) GroupAction(context.Context, *GroupActionRequest) (*empty.Empty, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GroupAction not implemented")
+func (UnimplementedSignalServiceServer) DeleteGroup(context.Context, *GroupRequest) (*empty.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DeleteGroup not implemented")
+}
+func (UnimplementedSignalServiceServer) JoinGroup(context.Context, *GroupRequest) (*empty.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method JoinGroup not implemented")
+}
+func (UnimplementedSignalServiceServer) BlockGroup(context.Context, *GroupRequest) (*empty.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method BlockGroup not implemented")
 }
 func (UnimplementedSignalServiceServer) GetQrCodeLink(context.Context, *GetQrCodeLinkRequest) (*GetQrCodeLinkResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetQrCodeLink not implemented")
@@ -531,20 +559,56 @@ func _SignalService_GetGroup_Handler(srv interface{}, ctx context.Context, dec f
 	return interceptor(ctx, in, info, handler)
 }
 
-func _SignalService_GroupAction_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(GroupActionRequest)
+func _SignalService_DeleteGroup_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GroupRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(SignalServiceServer).GroupAction(ctx, in)
+		return srv.(SignalServiceServer).DeleteGroup(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/SignalService/GroupAction",
+		FullMethod: "/SignalService/DeleteGroup",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(SignalServiceServer).GroupAction(ctx, req.(*GroupActionRequest))
+		return srv.(SignalServiceServer).DeleteGroup(ctx, req.(*GroupRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _SignalService_JoinGroup_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GroupRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SignalServiceServer).JoinGroup(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/SignalService/JoinGroup",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SignalServiceServer).JoinGroup(ctx, req.(*GroupRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _SignalService_BlockGroup_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GroupRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SignalServiceServer).BlockGroup(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/SignalService/BlockGroup",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SignalServiceServer).BlockGroup(ctx, req.(*GroupRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -745,8 +809,16 @@ var SignalService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _SignalService_GetGroup_Handler,
 		},
 		{
-			MethodName: "GroupAction",
-			Handler:    _SignalService_GroupAction_Handler,
+			MethodName: "DeleteGroup",
+			Handler:    _SignalService_DeleteGroup_Handler,
+		},
+		{
+			MethodName: "JoinGroup",
+			Handler:    _SignalService_JoinGroup_Handler,
+		},
+		{
+			MethodName: "BlockGroup",
+			Handler:    _SignalService_BlockGroup_Handler,
 		},
 		{
 			MethodName: "GetQrCodeLink",

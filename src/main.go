@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/datti-to/signal-cli-grpc-api/api"
+	"github.com/datti-to/signal-cli-grpc-api/client"
 	"github.com/datti-to/signal-cli-grpc-api/proto"
 	"github.com/datti-to/signal-cli-grpc-api/utils"
 	"github.com/robfig/cron/v3"
@@ -36,7 +37,9 @@ func main() {
 		log.Fatal("Couldn't set env variable: ", err.Error())
 	}
 
-	signalService := api.NewSignalService(*signalCliConfig, *attachmentTmpDir, *avatarTmpDir)
+	signalClient := client.NewSignalClient(*signalCliConfig, *attachmentTmpDir, *avatarTmpDir)
+
+	signalService := api.NewSignalService(signalClient)
 
 	port := utils.GetEnv("PORT", "9090")
 	if _, err := strconv.Atoi(port); err != nil {
