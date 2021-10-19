@@ -3,14 +3,15 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/datti-to/signal-cli-grpc-api/utils"
-	log "github.com/sirupsen/logrus"
 	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
+
+	"github.com/datti-to/signal-cli-grpc-api/utils"
+	log "github.com/sirupsen/logrus"
 )
 
 const supervisorctlConfigTemplate = `
