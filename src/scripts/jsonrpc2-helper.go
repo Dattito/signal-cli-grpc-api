@@ -3,7 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/bbernhard/signal-cli-rest-api/utils"
+	"github.com/datti-to/signal-cli-grpc-api/utils"
 	log "github.com/sirupsen/logrus"
 	"io/ioutil"
 	"os"
@@ -40,7 +40,7 @@ func main() {
 	fifoBasePathName := "/tmp/sigsocket"
 	var ctr int64 = 0
 
-	err := filepath.Walk(*signalCliConfigDir, func(path string, info os.FileInfo, err error) error {
+	filepath.Walk(*signalCliConfigDir, func(path string, info os.FileInfo, err error) error {
 		filename := filepath.Base(path)
 		if strings.HasPrefix(filename, "+") && info.Mode().IsRegular() {
 			fifoPathname := fifoBasePathName + strconv.FormatInt(ctr, 10)
@@ -77,7 +77,7 @@ func main() {
 	})
 
 	// write jsonrpc.yml config file
-	err = jsonRpc2ClientConfig.Persist(*signalCliConfigDir + "jsonrpc2.yml")
+	err := jsonRpc2ClientConfig.Persist(*signalCliConfigDir + "jsonrpc2.yml")
 	if err != nil {
 		log.Fatal("Couldn't persist jsonrpc2.yaml: ", err.Error())
 	}
