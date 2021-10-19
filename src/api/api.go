@@ -3,11 +3,13 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"net/http"
 
 	"github.com/datti-to/signal-cli-grpc-api/client"
 	pb "github.com/datti-to/signal-cli-grpc-api/proto"
 	"github.com/datti-to/signal-cli-grpc-api/utils"
 	"github.com/golang/protobuf/ptypes/empty"
+	"github.com/gorilla/websocket"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -24,6 +26,12 @@ type SignalCliGroupEntry struct {
 	PendingMembers    []string `json:"pendingMembers"`
 	RequestingMembers []string `json:"requestingMembers"`
 	GroupInviteLink   string   `json:"groupInviteLink"`
+}
+
+var connectionUpgrader = websocket.Upgrader{
+	CheckOrigin: func(r *http.Request) bool {
+		return true
+	},
 }
 
 type SignalService struct {
