@@ -128,6 +128,9 @@ RUN cd /tmp/signal-cli-grpc-api-src && go build
 # build supervisorctl_config_creator
 RUN cd /tmp/signal-cli-rest-api-src/scripts && go build -o jsonrpc2-helper 
 
+# build supervisorctl_config_creator
+RUN cd /tmp/signal-cli-rest-api-src/scripts && go build -o jsonrpc2-helper 
+
 
 # Start a fresh container for release container
 FROM eclipse-temurin:11-jre-focal
@@ -139,7 +142,7 @@ ENV PORT=9090
 ARG SIGNAL_CLI_VERSION
 
 RUN apt-get update \
-	&& apt-get install -y --no-install-recommends util-linux supervisor netcat \
+	&& apt-get install -y --no-install-recommends setpriv supervisor netcat \
 	&& rm -rf /var/lib/apt/lists/* 
 
 COPY --from=buildcontainer /tmp/signal-cli-grpc-api-src/signal-cli-grpc-api /usr/bin/signal-cli-grpc-api
