@@ -10,7 +10,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/datti-to/signal-cli-grpc-api/utils"
+	"github.com/dattito/signal-cli-grpc-api/utils"
 	log "github.com/sirupsen/logrus"
 )
 

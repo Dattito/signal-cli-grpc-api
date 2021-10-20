@@ -54,19 +54,18 @@ Notes:
 
 Sample `docker-compose.yml`file:
 
-```sh
+```yaml
 version: "3"
 services:
   signal-cli-grpc-api:
     image: dattito/signal-cli-grpc-api:latest
-	environment:
-	  - MODE=normal #supported modes: json-rpc, native, normal
-      #- AUTO_RECEIVE_SCHEDULE=0 22 * * * #enable this parameter on demand (see description below)
-	ports:
+    environment:
+      - MODE=normal #supported modes: json-rpc, native, normal
+        #- AUTO_RECEIVE_SCHEDULE=0 22 * * * #enable this parameter on demand (see description below)
+    ports:
       - "9090:9090" #map docker port 9090 to host port 9090.
     volumes:
       - "./signal-cli-config:/home/.local/share/signal-cli" #map "signal-cli-config" folder on host system into docker container. the folder contains the password and cryptographic keys when a new number is registered
-
 ```
 
 ## Documentation

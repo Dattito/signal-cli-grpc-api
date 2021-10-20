@@ -3,68 +3,46 @@ package api
 import (
 	"context"
 	"encoding/json"
-	"net/http"
 
-	"github.com/datti-to/signal-cli-grpc-api/client"
-	pb "github.com/datti-to/signal-cli-grpc-api/proto"
-	"github.com/datti-to/signal-cli-grpc-api/utils"
 	"github.com/golang/protobuf/ptypes/empty"
-	"github.com/gorilla/websocket"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
 	"google.golang.org/protobuf/types/known/timestamppb"
+
+	"github.com/dattito/signal-cli-grpc-api/client"
+	pb "github.com/dattito/signal-cli-grpc-api/proto"
+	utils "github.com/dattito/signal-cli-grpc-api/utils"
 )
 
-type SignalCliGroupEntry struct {
-	Name              string   `json:"name"`
-	Id                string   `json:"id"`
-	IsMember          bool     `json:"isMember"`
-	IsBlocked         bool     `json:"isBlocked"`
-	Members           []string `json:"members"`
-	PendingMembers    []string `json:"pendingMembers"`
-	RequestingMembers []string `json:"requestingMembers"`
-	GroupInviteLink   string   `json:"groupInviteLink"`
-}
-
-var connectionUpgrader = websocket.Upgrader{
-	CheckOrigin: func(r *http.Request) bool {
-		return true
-	},
-}
-
-type SignalService struct {
+type Api struct {
 	pb.UnimplementedSignalServiceServer
 	signalClient *client.SignalClient
 }
 
-func NewSignalService(signalClient *client.SignalClient) *SignalService {
-	return &SignalService{
+func NewApi(signalClient *client.SignalClient) *Api {
+	return &Api{
 		signalClient: signalClient,
 	}
 }
 
-func (s *SignalService) About(ctx context.Context, _ *emptypb.Empty) (*pb.AboutResponse, error) {
+func (a *Api) About(ctx context.Context, _ *emptypb.Empty) (*pb.AboutResponse, error) {
 
-	a := s.signalClient.About()
+	b := a.signalClient.About()
 
 	return &pb.AboutResponse{
-		Build:                int32(a.BuildNr),
-		SupportedApiVersions: a.SupportedApiVersions,
+		Build:                int32(b.BuildNr),
+		SupportedApiVersions: b.SupportedApiVersions,
 	}, nil
 }
 
-func (s *SignalService) Health(ctx context.Context, _ *empty.Empty) (*empty.Empty, error) {
-	return &empty.Empty{}, nil
-}
-
-func (s *SignalService) RegisterNumber(ctx context.Context, in *pb.RegisterNumberRequest) (*empty.Empty, error) {
+func (a *Api) RegisterNumber(ctx context.Context, in *pb.RegisterNumberRequest) (*empty.Empty, error) {
 	if in.Number == "" {
 		return nil, status.Error(codes.InvalidArgument, "Please provide a number")
 	}
 
-	err := s.signalClient.RegisterNumber(in.Number, in.UseVoice, in.Captcha)
+	err := a.signalClient.RegisterNumber(in.Number, in.UseVoice, in.Captcha)
 	if err != nil {
 		return nil, status.Error(codes.Unknown, err.Error())
 	}
@@ -72,7 +50,7 @@ func (s *SignalService) RegisterNumber(ctx context.Context, in *pb.RegisterNumbe
 	return &empty.Empty{}, nil
 }
 
-func (s *SignalService) VerifyRegisteredNumber(ctx context.Context, in *pb.VerifyRegisteredNumberRequest) (*empty.Empty, error) {
+func (a *Api) VerifyRegisteredNumber(ctx context.Context, in *pb.VerifyRegisteredNumberRequest) (*empty.Empty, error) {
 	if in.Number == "" {
 		return nil, status.Error(codes.InvalidArgument, "Please provide a number")
 	}
@@ -81,21 +59,21 @@ func (s *SignalService) VerifyRegisteredNumber(ctx context.Context, in *pb.Verif
 		return nil, status.Error(codes.InvalidArgument, "Please provide a verification code")
 	}
 
-	err := s.signalClient.VerifyRegisteredNumber(in.Number, in.Token, in.Pin)
+	err := a.signalClient.VerifyRegisteredNumber(in.Number, in.Token, in.Pin)
 	if err != nil {
 		return nil, status.Error(codes.Unknown, err.Error())
 	}
 	return &empty.Empty{}, nil
 }
 
-func (s *SignalService) Send(ctx context.Context, in *pb.SendRequest) (*pb.SendResponse, error) {
+func (a *Api) Send(ctx context.Context, in *pb.SendRequest) (*pb.SendResponse, error) {
 
 	base64Attachments := []string{}
 	if in.Base64Attachment != "" {
 		base64Attachments = append(base64Attachments, in.Base64Attachment)
 	}
 
-	timestamp, err := s.signalClient.SendV1(in.Number, in.Message, in.Recipients, base64Attachments, in.IsGroup)
+	timestamp, err := a.signalClient.SendV1(in.Number, in.Message, in.Recipients, base64Attachments, in.IsGroup)
 	if err != nil {
 		return nil, err
 	}
@@ -107,7 +85,7 @@ func (s *SignalService) Send(ctx context.Context, in *pb.SendRequest) (*pb.SendR
 	}, nil
 }
 
-func (s *SignalService) SendV2(ctx context.Context, in *pb.SendV2Request) (*pb.SendResponse, error) {
+func (a *Api) SendV2(ctx context.Context, in *pb.SendV2Request) (*pb.SendResponse, error) {
 	if len(in.Recipients) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "Please provide at least one recipient")
 	}
@@ -116,7 +94,7 @@ func (s *SignalService) SendV2(ctx context.Context, in *pb.SendV2Request) (*pb.S
 		return nil, status.Error(codes.InvalidArgument, "Please provide a number")
 	}
 
-	timestamp, err := s.signalClient.SendV2(in.Number, in.Message, in.Recipients, in.Base64Attachments)
+	timestamp, err := a.signalClient.SendV2(in.Number, in.Message, in.Recipients, in.Base64Attachments)
 	if err != nil {
 		return nil, err
 	}
@@ -128,12 +106,12 @@ func (s *SignalService) SendV2(ctx context.Context, in *pb.SendV2Request) (*pb.S
 	}, nil
 }
 
-func (s *SignalService) Receive(ctx context.Context, in *pb.ReceiveRequest) (*pb.ReceiveResponse, error) {
+func (a *Api) Receive(ctx context.Context, in *pb.ReceiveRequest) (*pb.ReceiveResponse, error) {
 	if in.Timeout == 0 {
 		in.Timeout = 1
 	}
 
-	jsonStr, err := s.signalClient.Receive(in.Number, int64(in.Timeout))
+	jsonStr, err := a.signalClient.Receive(in.Number, int64(in.Timeout))
 	if err != nil {
 		return nil, err
 	}
@@ -149,7 +127,7 @@ func (s *SignalService) Receive(ctx context.Context, in *pb.ReceiveRequest) (*pb
 	}, nil
 }
 
-func (s *SignalService) CreateGroup(ctx context.Context, in *pb.CreateGroupRequest) (*pb.CreateGroupResponse, error) {
+func (a *Api) CreateGroup(ctx context.Context, in *pb.CreateGroupRequest) (*pb.CreateGroupResponse, error) {
 	if in.Number == "" {
 		return nil, status.Error(codes.InvalidArgument, "Please provide a number")
 	}
@@ -170,7 +148,7 @@ func (s *SignalService) CreateGroup(ctx context.Context, in *pb.CreateGroupReque
 	addMembersPermission := client.DefaultGroupPermission
 	groupLinkState := client.DefaultGroupLinkState
 
-	groupId, err := s.signalClient.CreateGroup(in.Number, in.Name, in.Members, in.Description, editGroupPermission, addMembersPermission, groupLinkState)
+	groupId, err := a.signalClient.CreateGroup(in.Number, in.Name, in.Members, in.Description, editGroupPermission, addMembersPermission, groupLinkState)
 	if err != nil {
 		return nil, err
 	}
@@ -180,12 +158,12 @@ func (s *SignalService) CreateGroup(ctx context.Context, in *pb.CreateGroupReque
 	}, nil
 }
 
-func (s *SignalService) GetGroups(ctx context.Context, in *pb.GetGroupsRequest) (*pb.GetGroupsResponse, error) {
+func (a *Api) GetGroups(ctx context.Context, in *pb.GetGroupsRequest) (*pb.GetGroupsResponse, error) {
 	if in.Number == "" {
 		return nil, status.Error(codes.InvalidArgument, "Please provide a number")
 	}
 
-	groups, err := s.signalClient.GetGroups(in.Number)
+	groups, err := a.signalClient.GetGroups(in.Number)
 	if err != nil {
 		return nil, status.Error(codes.Unknown, err.Error())
 	}
@@ -210,7 +188,7 @@ func (s *SignalService) GetGroups(ctx context.Context, in *pb.GetGroupsRequest) 
 	}, nil
 }
 
-func (s *SignalService) GetGroup(ctx context.Context, in *pb.GroupRequest) (*pb.GetGroupResponse, error) {
+func (a *Api) GetGroup(ctx context.Context, in *pb.GroupRequest) (*pb.GetGroupResponse, error) {
 	if in.Number == "" {
 		return nil, status.Error(codes.InvalidArgument, "Please provide a number")
 	}
@@ -219,7 +197,7 @@ func (s *SignalService) GetGroup(ctx context.Context, in *pb.GroupRequest) (*pb.
 		return nil, status.Error(codes.InvalidArgument, "Please provide a group id")
 	}
 
-	group, err := s.signalClient.GetGroup(in.Number, in.Groupid)
+	group, err := a.signalClient.GetGroup(in.Number, in.Groupid)
 	if err != nil {
 		return nil, status.Error(codes.Unknown, err.Error())
 	}
@@ -240,7 +218,7 @@ func (s *SignalService) GetGroup(ctx context.Context, in *pb.GroupRequest) (*pb.
 	}, nil
 }
 
-func (s *SignalService) DeleteGroup(ctx context.Context, in *pb.GroupRequest) (*empty.Empty, error) {
+func (a *Api) DeleteGroup(ctx context.Context, in *pb.GroupRequest) (*empty.Empty, error) {
 	if in.Number == "" {
 		return nil, status.Error(codes.InvalidArgument, "Please provide a number")
 	}
@@ -254,7 +232,7 @@ func (s *SignalService) DeleteGroup(ctx context.Context, in *pb.GroupRequest) (*
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	err = s.signalClient.DeleteGroup(in.Number, groupId)
+	err = a.signalClient.DeleteGroup(in.Number, groupId)
 	if err != nil {
 		return nil, status.Error(codes.Unknown, err.Error())
 	}
@@ -262,12 +240,12 @@ func (s *SignalService) DeleteGroup(ctx context.Context, in *pb.GroupRequest) (*
 	return &empty.Empty{}, nil
 }
 
-func (s *SignalService) GetQrCodeLink(ctx context.Context, in *pb.GetQrCodeLinkRequest) (*pb.GetQrCodeLinkResponse, error) {
+func (a *Api) GetQrCodeLink(ctx context.Context, in *pb.GetQrCodeLinkRequest) (*pb.GetQrCodeLinkResponse, error) {
 	if in.DeviceName == "" {
 		return nil, status.Error(codes.InvalidArgument, "Please provide a name for the device")
 	}
 
-	png, err := s.signalClient.GetQrCodeLink(in.DeviceName)
+	png, err := a.signalClient.GetQrCodeLink(in.DeviceName)
 	if err != nil {
 		return nil, status.Error(codes.Unknown, err.Error())
 	}
@@ -277,8 +255,8 @@ func (s *SignalService) GetQrCodeLink(ctx context.Context, in *pb.GetQrCodeLinkR
 	}, nil
 }
 
-func (s *SignalService) GetAttachments(ctx context.Context, _ *empty.Empty) (*pb.GetAttachmentsResponse, error) {
-	files, err := s.signalClient.GetAttachments()
+func (a *Api) GetAttachments(ctx context.Context, _ *empty.Empty) (*pb.GetAttachmentsResponse, error) {
+	files, err := a.signalClient.GetAttachments()
 	if err != nil {
 		return nil, status.Error(codes.Unknown, err.Error())
 	}
@@ -288,8 +266,8 @@ func (s *SignalService) GetAttachments(ctx context.Context, _ *empty.Empty) (*pb
 	}, nil
 }
 
-func (s *SignalService) RemoveAttachment(ctx context.Context, in *pb.RemoveAttachmentRequest) (*empty.Empty, error) {
-	err := s.signalClient.RemoveAttachment(in.Attachment)
+func (a *Api) RemoveAttachment(ctx context.Context, in *pb.RemoveAttachmentRequest) (*empty.Empty, error) {
+	err := a.signalClient.RemoveAttachment(in.Attachment)
 
 	if err != nil {
 		switch err.(type) {
@@ -306,8 +284,8 @@ func (s *SignalService) RemoveAttachment(ctx context.Context, in *pb.RemoveAttac
 	return &empty.Empty{}, nil
 }
 
-func (s *SignalService) ServeAttachment(ctx context.Context, in *pb.ServeAttachmentRequest) (*pb.ServeAttachmentResponse, error) {
-	attachmentBytes, err := s.signalClient.GetAttachment(in.Attachment)
+func (a *Api) ServeAttachment(ctx context.Context, in *pb.ServeAttachmentRequest) (*pb.ServeAttachmentResponse, error) {
+	attachmentBytes, err := a.signalClient.GetAttachment(in.Attachment)
 
 	if err != nil {
 		switch err.(type) {
@@ -321,13 +299,15 @@ func (s *SignalService) ServeAttachment(ctx context.Context, in *pb.ServeAttachm
 			return nil, status.Error(codes.Unknown, err.Error())
 		}
 	}
+	return &empty.Empty{}, nil
+}
 
 	return &pb.ServeAttachmentResponse{
 		Attachment: attachmentBytes,
 	}, nil
 }
 
-func (s *SignalService) UpdateProfile(ctx context.Context, in *pb.UpdateProfileRequest) (*empty.Empty, error) {
+func (a *Api) UpdateProfile(ctx context.Context, in *pb.UpdateProfileRequest) (*empty.Empty, error) {
 	if in.Number == "" {
 		return nil, status.Error(codes.InvalidArgument, "Please provide a number")
 	}
@@ -336,7 +316,7 @@ func (s *SignalService) UpdateProfile(ctx context.Context, in *pb.UpdateProfileR
 		return nil, status.Error(codes.InvalidArgument, "Please provide a profile name")
 	}
 
-	err := s.signalClient.UpdateProfile(in.Number, in.Name, in.Base64Avatar)
+	err := a.signalClient.UpdateProfile(in.Number, in.Name, in.Base64Avatar)
 	if err != nil {
 		return nil, status.Error(codes.Unknown, err.Error())
 	}
@@ -344,12 +324,16 @@ func (s *SignalService) UpdateProfile(ctx context.Context, in *pb.UpdateProfileR
 	return &empty.Empty{}, nil
 }
 
-func (s *SignalService) ListIdentities(ctx context.Context, in *pb.ListIdentitiesRequest) (*pb.ListIdentitiesResponse, error) {
+func (a *Api) Health(ctx context.Context, _ *empty.Empty) (*empty.Empty, error) {
+	return &empty.Empty{}, nil
+}
+
+func (a *Api) ListIdentities(ctx context.Context, in *pb.ListIdentitiesRequest) (*pb.ListIdentitiesResponse, error) {
 	if in.Number == "" {
 		return nil, status.Error(codes.InvalidArgument, "Please provide a number")
 	}
 
-	identities, err := s.signalClient.ListIdentities(in.Number)
+	identities, err := a.signalClient.ListIdentities(in.Number)
 	if err != nil {
 		return nil, status.Error(codes.Unknown, err.Error())
 	}
@@ -370,7 +354,7 @@ func (s *SignalService) ListIdentities(ctx context.Context, in *pb.ListIdentitie
 	}, nil
 }
 
-func (s *SignalService) TrustIdentity(ctx context.Context, in *pb.TrustIdentityRequest) (*empty.Empty, error) {
+func (a *Api) TrustIdentity(ctx context.Context, in *pb.TrustIdentityRequest) (*empty.Empty, error) {
 	if in.Number == "" {
 		return nil, status.Error(codes.InvalidArgument, "Please provide a number")
 	}
@@ -383,7 +367,7 @@ func (s *SignalService) TrustIdentity(ctx context.Context, in *pb.TrustIdentityR
 		return nil, status.Error(codes.InvalidArgument, "Please provide a verified safety number")
 	}
 
-	err := s.signalClient.TrustIdentity(in.Number, in.NumberToTrust, in.VerifiedSafetyNumber)
+	err := a.signalClient.TrustIdentity(in.Number, in.NumberToTrust, in.VerifiedSafetyNumber)
 	if err != nil {
 		return nil, status.Error(codes.Unknown, err.Error())
 	}
@@ -391,7 +375,7 @@ func (s *SignalService) TrustIdentity(ctx context.Context, in *pb.TrustIdentityR
 	return &empty.Empty{}, nil
 }
 
-func (s *SignalService) SetConfiguration(ctx context.Context, in *pb.SetConfigurationRequest) (*empty.Empty, error) {
+func (a *Api) SetConfiguration(ctx context.Context, in *pb.SetConfigurationRequest) (*empty.Empty, error) {
 	if in.Logging.Level != "" {
 		if in.Logging.Level == "debug" {
 			log.SetLevel(log.DebugLevel)
@@ -407,7 +391,7 @@ func (s *SignalService) SetConfiguration(ctx context.Context, in *pb.SetConfigur
 	return &empty.Empty{}, nil
 }
 
-func (s *SignalService) GetConfiguration(ctx context.Context, _ *empty.Empty) (*pb.GetConfigurationResponse, error) {
+func (a *Api) GetConfiguration(ctx context.Context, _ *empty.Empty) (*pb.GetConfigurationResponse, error) {
 	logLevel := ""
 	if log.GetLevel() == log.DebugLevel {
 		logLevel = "debug"
@@ -424,7 +408,7 @@ func (s *SignalService) GetConfiguration(ctx context.Context, _ *empty.Empty) (*
 	}, nil
 }
 
-func (s *SignalService) BlockGroup(ctx context.Context, in *pb.GroupRequest) (*empty.Empty, error) {
+func (a *Api) BlockGroup(ctx context.Context, in *pb.GroupRequest) (*empty.Empty, error) {
 	if in.Number == "" {
 		return nil, status.Error(codes.InvalidArgument, "Please provide a number")
 	}
@@ -433,7 +417,7 @@ func (s *SignalService) BlockGroup(ctx context.Context, in *pb.GroupRequest) (*e
 		return nil, status.Error(codes.InvalidArgument, "Please provide a group id")
 	}
 
-	err := s.signalClient.BlockGroup(in.Number, in.Groupid)
+	err := a.signalClient.BlockGroup(in.Number, in.Groupid)
 	if err != nil {
 		return nil, status.Error(codes.Unknown, err.Error())
 	}
@@ -441,7 +425,7 @@ func (s *SignalService) BlockGroup(ctx context.Context, in *pb.GroupRequest) (*e
 	return &empty.Empty{}, nil
 }
 
-func (s *SignalService) JoinGroup(ctx context.Context, in *pb.GroupRequest) (*empty.Empty, error) {
+func (a *Api) JoinGroup(ctx context.Context, in *pb.GroupRequest) (*empty.Empty, error) {
 	if in.Number == "" {
 		return nil, status.Error(codes.InvalidArgument, "Please provide a number")
 	}
@@ -450,7 +434,7 @@ func (s *SignalService) JoinGroup(ctx context.Context, in *pb.GroupRequest) (*em
 		return nil, status.Error(codes.InvalidArgument, "Please provide a group id")
 	}
 
-	err := s.signalClient.JoinGroup(in.Number, in.Groupid)
+	err := a.signalClient.JoinGroup(in.Number, in.Groupid)
 	if err != nil {
 		return nil, status.Error(codes.Unknown, err.Error())
 	}
@@ -458,7 +442,7 @@ func (s *SignalService) JoinGroup(ctx context.Context, in *pb.GroupRequest) (*em
 	return &empty.Empty{}, nil
 }
 
-func (s *SignalService) QuitGroup(ctx context.Context, in *pb.GroupRequest) (*empty.Empty, error) {
+func (a *Api) QuitGroup(ctx context.Context, in *pb.GroupRequest) (*empty.Empty, error) {
 	if in.Number == "" {
 		return nil, status.Error(codes.InvalidArgument, "Please provide a number")
 	}
@@ -467,7 +451,7 @@ func (s *SignalService) QuitGroup(ctx context.Context, in *pb.GroupRequest) (*em
 		return nil, status.Error(codes.InvalidArgument, "Please provide a group id")
 	}
 
-	err := s.signalClient.QuitGroup(in.Number, in.Groupid)
+	err := a.signalClient.QuitGroup(in.Number, in.Groupid)
 	if err != nil {
 		return nil, status.Error(codes.Unknown, err.Error())
 	}

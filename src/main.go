@@ -10,10 +10,10 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/datti-to/signal-cli-grpc-api/api"
-	"github.com/datti-to/signal-cli-grpc-api/client"
-	"github.com/datti-to/signal-cli-grpc-api/proto"
-	"github.com/datti-to/signal-cli-grpc-api/utils"
+	"github.com/dattito/signal-cli-grpc-api/api"
+	"github.com/dattito/signal-cli-grpc-api/client"
+	"github.com/dattito/signal-cli-grpc-api/proto"
+	"github.com/dattito/signal-cli-grpc-api/utils"
 	"github.com/robfig/cron/v3"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
@@ -78,7 +78,6 @@ func main() {
 		}
 	}
 
-
 	jsonRpc2ClientConfigPathPath := *signalCliConfig + "/jsonrpc2.yml"
 	signalClient := client.NewSignalClient(*signalCliConfig, *attachmentTmpDir, *avatarTmpDir, signalCliMode, jsonRpc2ClientConfigPathPath)
 	err = signalClient.Init()
@@ -86,7 +85,7 @@ func main() {
 		log.Fatal("Couldn't init Signal Client: ", err.Error())
 	}
 
-	signalService := api.NewSignalService(signalClient)
+	api := api.NewApi(signalClient)
 
 	port := utils.GetEnv("PORT", "9090")
 	if _, err := strconv.Atoi(port); err != nil {
@@ -107,8 +106,7 @@ func main() {
 				filename := filepath.Base(path)
 				if strings.HasPrefix(filename, "+") && info.Mode().IsRegular() {
 					log.Debug("AUTO_RECEIVE_SCHEDULE: Calling receive for number ", filename)
-					// resp, err := http.Get("http://127.0.0.1:" + port + "/v1/receive/" + filename)
-					_, err := signalService.Receive(context.TODO(), &proto.ReceiveRequest{
+					_, err := api.Receive(context.TODO(), &proto.ReceiveRequest{
 						Number: filename,
 					})
 					if err != nil {
@@ -132,7 +130,7 @@ func main() {
 	var opts []grpc.ServerOption
 	grpcServer := grpc.NewServer(opts...)
 
-	proto.RegisterSignalServiceServer(grpcServer, signalService)
+	proto.RegisterSignalServiceServer(grpcServer, api)
 
 	if err := grpcServer.Serve(lis); err != nil {
 		panic(err)

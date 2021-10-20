@@ -23,7 +23,7 @@ import (
 	uuid "github.com/gofrs/uuid"
 	qrcode "github.com/skip2/go-qrcode"
 
-	utils "github.com/datti-to/signal-cli-grpc-api/utils"
+	utils "github.com/dattito/signal-cli-grpc-api/utils"
 )
 
 const groupPrefix = "group."
@@ -117,6 +117,7 @@ type SendResponse struct {
 type About struct {
 	SupportedApiVersions []string `json:"versions"`
 	BuildNr              int      `json:"build"`
+	Mode                 string   `json:"mode"`
 }
 
 func cleanupTmpFiles(paths []string) {
@@ -273,6 +274,17 @@ func ConvertGroupIdToInternalGroupId(id string) (string, error) {
 	}
 
 	return string(internalGroupId), err
+}
+
+func getSignalCliModeString(signalCliMode SignalCliMode) string {
+	if signalCliMode == Normal {
+		return "normal"
+	} else if signalCliMode == Native {
+		return "native"
+	} else if signalCliMode == JsonRpc {
+		return "json-rpc"
+	}
+	return "unknown"
 }
 
 type SignalClient struct {
@@ -450,7 +462,7 @@ func (s *SignalClient) send(number string, message string,
 }
 
 func (s *SignalClient) About() About {
-	about := About{SupportedApiVersions: []string{"v1", "v2"}, BuildNr: 2}
+	about := About{SupportedApiVersions: []string{"v1", "v2"}, BuildNr: 2, Mode: getSignalCliModeString(s.signalCliMode)}
 	return about
 }
 
@@ -583,8 +595,7 @@ func (s *SignalClient) Receive(number string, timeout int64) (string, error) {
 }
 
 func (s *SignalClient) CreateGroup(number string, name string, members []string, description string, editGroupPermission GroupPermission, addMembersPermission GroupPermission, groupLinkState GroupLinkState) (string, error) {
-	var err error
-	var rawData string
+	var internalGroupId string
 	if s.signalCliMode == JsonRpc {
 		type Request struct {
 			Name    string   `json:"name"`
@@ -596,10 +607,21 @@ func (s *SignalClient) CreateGroup(number string, name string, members []string,
 		if err != nil {
 			return "", err
 		}
-		rawData, err = jsonRpc2Client.getRaw("updateGroup", request)
+		rawData, err := jsonRpc2Client.getRaw("updateGroup", request)
 		if err != nil {
 			return "", err
 		}
+
+		type Response struct {
+			GroupId    string   `json:"groupId"`
+			Timestamp  int64    `json:"timestamp"`
+		}
+		var resp Response
+		json.Unmarshal([]byte(rawData), &resp)
+		if err != nil {
+			return "", err
+		}
+		internalGroupId = resp.GroupId
 	} else {
 		cmd := []string{"--config", s.signalCliConfig, "-u", number, "updateGroup", "-n", name, "-m"}
 		cmd = append(cmd, members...)
@@ -620,15 +642,15 @@ func (s *SignalClient) CreateGroup(number string, name string, members []string,
 			cmd = append(cmd, []string{"--description", description}...)
 		}
 
-		rawData, err = runSignalCli(true, cmd, "", s.signalCliMode)
+		rawData, err := runSignalCli(true, cmd, "", s.signalCliMode)
 		if err != nil {
 			if strings.Contains(err.Error(), signalCliV2GroupError) {
 				return "", errors.New("cannot create group - please first update your profile")
 			}
 			return "", err
 		}
+		internalGroupId = getStringInBetween(rawData, `"`, `"`)
 	}
-	internalGroupId := getStringInBetween(rawData, `"`, `"`)
 	groupId := convertInternalGroupIdToGroupId(internalGroupId)
 
 	return groupId, nil
