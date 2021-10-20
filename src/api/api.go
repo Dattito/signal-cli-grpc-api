@@ -34,6 +34,7 @@ func (a *Api) About(ctx context.Context, _ *emptypb.Empty) (*pb.AboutResponse, e
 	return &pb.AboutResponse{
 		Build:                int32(b.BuildNr),
 		SupportedApiVersions: b.SupportedApiVersions,
+		Mode: b.Mode,
 	}, nil
 }
 

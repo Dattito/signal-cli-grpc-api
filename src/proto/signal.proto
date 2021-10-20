@@ -33,6 +33,7 @@ service SignalService {
 message AboutResponse {
     int32 build = 1;
     repeated string supported_api_versions = 2;
+    string mode = 3;
 }
 
 message Logging {
