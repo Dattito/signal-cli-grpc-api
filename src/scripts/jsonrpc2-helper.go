@@ -3,7 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/bbernhard/signal-cli-rest-api/utils"
+	"github.com/dattito/signal-cli-grpc-api/utils"
 	log "github.com/sirupsen/logrus"
 	"io/ioutil"
 	"os"

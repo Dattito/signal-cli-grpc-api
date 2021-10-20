@@ -23,7 +23,7 @@ import (
 	uuid "github.com/gofrs/uuid"
 	qrcode "github.com/skip2/go-qrcode"
 
-	utils "github.com/bbernhard/signal-cli-rest-api/utils"
+	utils "github.com/dattito/signal-cli-grpc-api/utils"
 )
 
 const groupPrefix = "group."

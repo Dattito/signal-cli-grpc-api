@@ -1,780 +1,395 @@
 package api
 
 import (
-	"bytes"
+	"context"
 	"encoding/json"
-	"net/http"
-	"strconv"
-	"time"
 
-	"github.com/gabriel-vasile/mimetype"
-	"github.com/gin-gonic/gin"
+	"github.com/golang/protobuf/ptypes/empty"
 	log "github.com/sirupsen/logrus"
-	"github.com/gorilla/websocket"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/emptypb"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
-	"github.com/bbernhard/signal-cli-rest-api/client"
-	utils "github.com/bbernhard/signal-cli-rest-api/utils"
+	"github.com/dattito/signal-cli-grpc-api/client"
+	pb "github.com/dattito/signal-cli-grpc-api/proto"
+	utils "github.com/dattito/signal-cli-grpc-api/utils"
 )
-
-const (
-	// Time allowed to write the file to the client.
-	writeWait = 10 * time.Second
-
-	// Time allowed to read the next pong message from the client.
-	pongWait = 60 * time.Second
-
-	// Send pings to client with this period. Must be less than pongWait.
-	pingPeriod = (pongWait * 9) / 10
-)
-
-type GroupPermissions struct {
-	AddMembers string `json:"add_members" enums:"only-admins,every-member"`
-	EditGroup string `json:"edit_group" enums:"only-admins,every-member"`
-}
-
-type CreateGroupRequest struct {
-	Name    string   `json:"name"`
-	Members []string `json:"members"`
-	Description string `json:"description"`
-	Permissions GroupPermissions `json:"permissions"`
-	GroupLinkState string `json:"group_link" enums:"disabled,enabled,enabled-with-approval"`
-}
-
-type LoggingConfiguration struct {
-	Level            string   `json:"Level"`
-}
-
-type Configuration struct {
-	Logging            LoggingConfiguration   `json:"logging"`
-}
-
-type RegisterNumberRequest struct {
-	UseVoice bool   `json:"use_voice"`
-	Captcha  string `json:"captcha"`
-}
-
-type VerifyNumberSettings struct {
-	Pin string `json:"pin"`
-}
-
-type SendMessageV1 struct {
-	Number           string   `json:"number"`
-	Recipients       []string `json:"recipients"`
-	Message          string   `json:"message"`
-	Base64Attachment string   `json:"base64_attachment"`
-	IsGroup          bool     `json:"is_group"`
-}
-
-type SendMessageV2 struct {
-	Number            string   `json:"number"`
-	Recipients        []string `json:"recipients"`
-	Message           string   `json:"message"`
-	Base64Attachments []string `json:"base64_attachments"`
-}
-
-type Error struct {
-	Msg string `json:"error"`
-}
-
-
-
-type CreateGroupResponse struct {
-	Id string `json:"id"`
-}
-
-type UpdateProfileRequest struct {
-	Name         string `json:"name"`
-	Base64Avatar string `json:"base64_avatar"`
-}
-
-type TrustIdentityRequest struct {
-	VerifiedSafetyNumber string `json:"verified_safety_number"`
-}
-
-type SendMessageResponse struct {
-	Timestamp string `json:"timestamp"`
-}
-
-var connectionUpgrader = websocket.Upgrader{
-	CheckOrigin: func(r *http.Request) bool {
-		return true
-	},
-}
 
 type Api struct {
-	signalClient  *client.SignalClient
+	pb.UnimplementedSignalServiceServer
+	signalClient *client.SignalClient
 }
 
 func NewApi(signalClient *client.SignalClient) *Api {
 	return &Api{
-		signalClient:  signalClient,
+		signalClient: signalClient,
 	}
 }
 
-// @Summary Lists general information about the API
-// @Tags General
-// @Description Returns the supported API versions and the internal build nr
-// @Produce  json
-// @Success 200 {object} client.About
-// @Router /v1/about [get]
-func (a *Api) About(c *gin.Context) {
-	c.JSON(200, a.signalClient.About())
+func (a *Api) About(ctx context.Context, _ *emptypb.Empty) (*pb.AboutResponse, error) {
+
+	b := a.signalClient.About()
+
+	return &pb.AboutResponse{
+		Build:                int32(b.BuildNr),
+		SupportedApiVersions: b.SupportedApiVersions,
+	}, nil
 }
 
-// @Summary Register a phone number.
-// @Tags Devices
-// @Description Register a phone number with the signal network.
-// @Accept  json
-// @Produce  json
-// @Success 201
-// @Failure 400 {object} Error
-// @Param number path string true "Registered Phone Number"
-// @Param data body RegisterNumberRequest false "Additional Settings"
-// @Router /v1/register/{number} [post]
-func (a *Api) RegisterNumber(c *gin.Context) {
-	number := c.Param("number")
-
-	var req RegisterNumberRequest
-
-	buf := new(bytes.Buffer)
-	buf.ReadFrom(c.Request.Body)
-	if buf.String() != "" {
-		err := json.Unmarshal(buf.Bytes(), &req)
-		if err != nil {
-			log.Error("Couldn't register number: ", err.Error())
-			c.JSON(400, Error{Msg: "Couldn't process request - invalid request."})
-			return
-		}
-	} else {
-		req.UseVoice = false
-		req.Captcha = ""
+func (a *Api) RegisterNumber(ctx context.Context, in *pb.RegisterNumberRequest) (*empty.Empty, error) {
+	if in.Number == "" {
+		return nil, status.Error(codes.InvalidArgument, "Please provide a number")
 	}
 
-	if number == "" {
-		c.JSON(400, gin.H{"error": "Please provide a number"})
-		return
-	}
-
-	err := a.signalClient.RegisterNumber(number, req.UseVoice, req.Captcha)
+	err := a.signalClient.RegisterNumber(in.Number, in.UseVoice, in.Captcha)
 	if err != nil {
-		c.JSON(400, gin.H{"error": err.Error()})
-		return
+		return nil, status.Error(codes.Unknown, err.Error())
 	}
-	c.Writer.WriteHeader(201)
+
+	return &empty.Empty{}, nil
 }
 
-// @Summary Verify a registered phone number.
-// @Tags Devices
-// @Description Verify a registered phone number with the signal network.
-// @Accept  json
-// @Produce  json
-// @Success 201 {string} string "OK"
-// @Failure 400 {object} Error
-// @Param number path string true "Registered Phone Number"
-// @Param data body VerifyNumberSettings false "Additional Settings"
-// @Param token path string true "Verification Code"
-// @Router /v1/register/{number}/verify/{token} [post]
-func (a *Api) VerifyRegisteredNumber(c *gin.Context) {
-	number := c.Param("number")
-	token := c.Param("token")
-
-	pin := ""
-	var req VerifyNumberSettings
-	buf := new(bytes.Buffer)
-	buf.ReadFrom(c.Request.Body)
-	if buf.String() != "" {
-		err := json.Unmarshal(buf.Bytes(), &req)
-		if err != nil {
-			log.Error("Couldn't verify number: ", err.Error())
-			c.JSON(400, Error{Msg: "Couldn't process request - invalid request."})
-			return
-		}
-		pin = req.Pin
+func (a *Api) VerifyRegisteredNumber(ctx context.Context, in *pb.VerifyRegisteredNumberRequest) (*empty.Empty, error) {
+	if in.Number == "" {
+		return nil, status.Error(codes.InvalidArgument, "Please provide a number")
 	}
 
-	if number == "" {
-		c.JSON(400, gin.H{"error": "Please provide a number"})
-		return
+	if in.Token == "" {
+		return nil, status.Error(codes.InvalidArgument, "Please provide a verification code")
 	}
 
-	if token == "" {
-		c.JSON(400, gin.H{"error": "Please provide a verification code"})
-		return
-	}
-
-	err := a.signalClient.VerifyRegisteredNumber(number, token, pin)
+	err := a.signalClient.VerifyRegisteredNumber(in.Number, in.Token, in.Pin)
 	if err != nil {
-		c.JSON(400, gin.H{"error": err.Error()})
-		return
+		return nil, status.Error(codes.Unknown, err.Error())
 	}
-	c.Writer.WriteHeader(201)
+	return &empty.Empty{}, nil
 }
 
-// @Summary Send a signal message.
-// @Tags Messages
-// @Description Send a signal message
-// @Accept  json
-// @Produce  json
-// @Success 201 {string} string "OK"
-// @Failure 400 {object} Error
-// @Param data body SendMessageV1 true "Input Data"
-// @Router /v1/send [post]
-// @Deprecated
-func (a *Api) Send(c *gin.Context) {
-
-	var req SendMessageV1
-	err := c.BindJSON(&req)
-	if err != nil {
-		c.JSON(400, Error{Msg: "Couldn't process request - invalid request"})
-		return
-	}
+func (a *Api) Send(ctx context.Context, in *pb.SendRequest) (*pb.SendResponse, error) {
 
 	base64Attachments := []string{}
-	if req.Base64Attachment != "" {
-		base64Attachments = append(base64Attachments, req.Base64Attachment)
+	if in.Base64Attachment != "" {
+		base64Attachments = append(base64Attachments, in.Base64Attachment)
 	}
 
-	timestamp, err := a.signalClient.SendV1(req.Number, req.Message, req.Recipients, base64Attachments, req.IsGroup)
+	timestamp, err := a.signalClient.SendV1(in.Number, in.Message, in.Recipients, base64Attachments, in.IsGroup)
 	if err != nil {
-		c.JSON(400, Error{Msg: err.Error()})
-		return
+		return nil, err
 	}
-	c.JSON(201, SendMessageResponse{Timestamp: strconv.FormatInt(timestamp.Timestamp, 10)})
+
+	return &pb.SendResponse{
+		Timestamp: &timestamppb.Timestamp{
+			Seconds: timestamp.Timestamp,
+		},
+	}, nil
 }
 
-// @Summary Send a signal message.
-// @Tags Messages
-// @Description Send a signal message
-// @Accept  json
-// @Produce  json
-// @Success 201 {object} SendMessageResponse
-// @Failure 400 {object} Error
-// @Param data body SendMessageV2 true "Input Data"
-// @Router /v2/send [post]
-func (a *Api) SendV2(c *gin.Context) {
-	var req SendMessageV2
-	err := c.BindJSON(&req)
+func (a *Api) SendV2(ctx context.Context, in *pb.SendV2Request) (*pb.SendResponse, error) {
+	if len(in.Recipients) == 0 {
+		return nil, status.Error(codes.InvalidArgument, "Please provide at least one recipient")
+	}
+
+	if in.Number == "" {
+		return nil, status.Error(codes.InvalidArgument, "Please provide a number")
+	}
+
+	timestamp, err := a.signalClient.SendV2(in.Number, in.Message, in.Recipients, in.Base64Attachments)
 	if err != nil {
-		c.JSON(400, gin.H{"error": "Couldn't process request - invalid request"})
-		log.Error(err.Error())
-		return
+		return nil, err
 	}
 
-	if len(req.Recipients) == 0 {
-		c.JSON(400, gin.H{"error": "Couldn't process request - please provide at least one recipient"})
-		return
+	return &pb.SendResponse{
+		Timestamp: &timestamppb.Timestamp{
+			Seconds: (*timestamp)[0].Timestamp,
+		},
+	}, nil
+}
+
+func (a *Api) Receive(ctx context.Context, in *pb.ReceiveRequest) (*pb.ReceiveResponse, error) {
+	if in.Timeout == 0 {
+		in.Timeout = 1
 	}
 
-	if req.Number == "" {
-		c.JSON(400, gin.H{"error": "Couldn't process request - please provide a valid number"})
-		return
-	}
-
-	timestamps, err := a.signalClient.SendV2(req.Number, req.Message, req.Recipients, req.Base64Attachments)
+	jsonStr, err := a.signalClient.Receive(in.Number, int64(in.Timeout))
 	if err != nil {
-		c.JSON(400, Error{Msg: err.Error()})
-		return
+		return nil, err
 	}
 
-	c.JSON(201, SendMessageResponse{Timestamp: strconv.FormatInt((*timestamps)[0].Timestamp, 10)})
+	slice_messages := []string{}
+
+	if err := json.Unmarshal([]byte(jsonStr), &slice_messages); err != nil {
+		return nil, err
+	}
+
+	return &pb.ReceiveResponse{
+		Messages: slice_messages,
+	}, nil
 }
 
-
-func (a *Api) handleSignalReceive(ws *websocket.Conn, number string) {
-	for {
-		data, err := a.signalClient.Receive(number, 0)
-		if err == nil {
-			err = ws.WriteMessage(websocket.TextMessage, []byte(data))
-			if err != nil {
-				log.Error("Couldn't write message: " + err.Error())
-				return
-			}
-		} else {
-			errorMsg := Error{Msg: err.Error()}
-			errorMsgBytes, err := json.Marshal(errorMsg)
-			if err != nil {
-				log.Error("Couldn't serialize error message: " + err.Error())
-				return
-			}
-			err = ws.WriteMessage(websocket.TextMessage, errorMsgBytes)
-			if err != nil {
-				log.Error("Couldn't write message: " + err.Error())
-				return
-			}
-		}
-	}
-}
-
-func wsPong(ws *websocket.Conn) {
-	ws.SetReadLimit(512)
-	ws.SetPongHandler(func(string) error { log.Debug("Received pong"); return nil })
-	for {
-		_, _, err := ws.ReadMessage()
-		if err != nil {
-			break
-		}
-	}
-}
-
-func wsPing(ws *websocket.Conn) {
-	pingTicker := time.NewTicker(pingPeriod)
-	for {
-		select {
-		case <-pingTicker.C:
-			if err := ws.WriteMessage(websocket.PingMessage, []byte{}); err != nil {
-				return
-			}
-		}
-	}
-}
-
-// @Summary Receive Signal Messages.
-// @Tags Messages
-// @Description Receives Signal Messages from the Signal Network. If you are running the docker container in normal/native mode, this is a GET endpoint. In json-rpc mode this is a websocket endpoint.
-// @Accept  json
-// @Produce  json
-// @Success 200 {object} []string
-// @Failure 400 {object} Error
-// @Param number path string true "Registered Phone Number"
-// @Param timeout query string false "Receive timeout in seconds (default: 1)"
-// @Router /v1/receive/{number} [get]
-func (a *Api) Receive(c *gin.Context) {
-	number := c.Param("number")
-
-	if a.signalClient.GetSignalCliMode() == client.JsonRpc {
-		ws, err := connectionUpgrader.Upgrade(c.Writer, c.Request, nil)
-		if err != nil {
-			c.JSON(400, Error{Msg: err.Error()})
-			return
-		}
-		defer ws.Close()
-		go a.handleSignalReceive(ws, number)
-		go wsPing(ws)
-		wsPong(ws)
-	} else {
-		timeout := c.DefaultQuery("timeout", "1")
-		timeoutInt, err := strconv.ParseInt(timeout, 10, 32)
-		if err != nil {
-			c.JSON(400, Error{Msg: "Couldn't process request - timeout needs to be numeric!"})
-			return
-		}
-
-		jsonStr, err := a.signalClient.Receive(number, timeoutInt)
-		if err != nil {
-			c.JSON(400, Error{Msg: err.Error()})
-			return
-		}
-
-		c.String(200, jsonStr)
-	}
-}
-
-// @Summary Create a new Signal Group.
-// @Tags Groups
-// @Description Create a new Signal Group with the specified members.
-// @Accept  json
-// @Produce  json
-// @Success 201 {object} CreateGroupResponse
-// @Failure 400 {object} Error
-// @Param data body CreateGroupRequest true "Input Data"
-// @Param number path string true "Registered Phone Number"
-// @Router /v1/groups/{number} [post]
-func (a *Api) CreateGroup(c *gin.Context) {
-	number := c.Param("number")
-
-	var req CreateGroupRequest
-	err := c.BindJSON(&req)
-	if err != nil {
-		c.JSON(400, Error{Msg: "Couldn't process request - invalid request"})
-		return
+func (a *Api) CreateGroup(ctx context.Context, in *pb.CreateGroupRequest) (*pb.CreateGroupResponse, error) {
+	if in.Number == "" {
+		return nil, status.Error(codes.InvalidArgument, "Please provide a number")
 	}
 
-	if req.Permissions.AddMembers != "" && !utils.StringInSlice(req.Permissions.AddMembers, []string{"every-member", "only-admins"}) {
-		c.JSON(400, Error{Msg: "Invalid add members permission provided - only 'every-member' and 'only-admins' allowed!"})
-		return
+	if in.Permissions.AddMembers != "" && !utils.StringInSlice(in.Permissions.AddMembers, []string{"every-member", "only-admins"}) {
+		return nil, status.Error(codes.InvalidArgument, "Invalid edit group permissions provided - only 'every-member' and 'only-admins' allowed!")
 	}
 
-	if req.Permissions.EditGroup != "" && !utils.StringInSlice(req.Permissions.EditGroup, []string{"every-member", "only-admins"}) {
-		c.JSON(400, Error{Msg: "Invalid edit group permissions provided - only 'every-member' and 'only-admins' allowed!"})
-		return
+	if in.Permissions.EditGroup != "" && !utils.StringInSlice(in.Permissions.EditGroup, []string{"every-member", "only-admins"}) {
+		return nil, status.Error(codes.InvalidArgument, "Invalid add members permission provided - only 'every-member' and 'only-admins' allowed!")
 	}
 
-	if req.GroupLinkState != "" && !utils.StringInSlice(req.GroupLinkState, []string{"enabled", "enabled-with-approval", "disabled"}) {
-		c.JSON(400, Error{Msg: "Invalid group link provided - only 'enabled', 'enabled-with-approval' and 'disabled' allowed!" })
-		return
+	if in.GroupLink != "" && !utils.StringInSlice(in.GroupLink, []string{"enabled", "enabled-with-approval", "disabled"}) {
+		return nil, status.Error(codes.InvalidArgument, "Invalid group link provided - only 'enabled', 'enabled-with-approval' and 'disabled' allowed!")
 	}
 
 	editGroupPermission := client.DefaultGroupPermission
 	addMembersPermission := client.DefaultGroupPermission
 	groupLinkState := client.DefaultGroupLinkState
 
-	groupId, err := a.signalClient.CreateGroup(number, req.Name, req.Members, req.Description, editGroupPermission, addMembersPermission, groupLinkState)
+	groupId, err := a.signalClient.CreateGroup(in.Number, in.Name, in.Members, in.Description, editGroupPermission, addMembersPermission, groupLinkState)
 	if err != nil {
-		c.JSON(400, Error{Msg: err.Error()})
-		return
+		return nil, err
 	}
 
-	c.JSON(201, CreateGroupResponse{Id: groupId})
+	return &pb.CreateGroupResponse{
+		Id: groupId,
+	}, nil
 }
 
-// @Summary List all Signal Groups.
-// @Tags Groups
-// @Description List all Signal Groups.
-// @Accept  json
-// @Produce  json
-// @Success 200 {object} []client.GroupEntry
-// @Failure 400 {object} Error
-// @Param number path string true "Registered Phone Number"
-// @Router /v1/groups/{number} [get]
-func (a *Api) GetGroups(c *gin.Context) {
-	number := c.Param("number")
-
-	groups, err := a.signalClient.GetGroups(number)
-	if err != nil {
-		c.JSON(400, Error{Msg: err.Error()})
-		return
+func (a *Api) GetGroups(ctx context.Context, in *pb.GetGroupsRequest) (*pb.GetGroupsResponse, error) {
+	if in.Number == "" {
+		return nil, status.Error(codes.InvalidArgument, "Please provide a number")
 	}
 
-	c.JSON(200, groups)
+	groups, err := a.signalClient.GetGroups(in.Number)
+	if err != nil {
+		return nil, status.Error(codes.Unknown, err.Error())
+	}
+
+	grpc_groups := []*pb.GetGroupResponse{}
+
+	for _, group := range groups {
+		grpc_groups = append(grpc_groups, &pb.GetGroupResponse{
+			Name:            group.Name,
+			Id:              group.Id,
+			InternalId:      group.InternalId,
+			Members:         group.Members,
+			Blocked:         group.Blocked,
+			PendingInvites:  group.PendingInvites,
+			PendingRequests: group.PendingRequests,
+			InviteLink:      group.InviteLink,
+		})
+	}
+
+	return &pb.GetGroupsResponse{
+		Groups: grpc_groups,
+	}, nil
 }
 
-// @Summary List a Signal Group.
-// @Tags Groups
-// @Description List a specific Signal Group.
-// @Accept  json
-// @Produce  json
-// @Success 200 {object} client.GroupEntry
-// @Failure 400 {object} Error
-// @Param number path string true "Registered Phone Number"
-// @Param groupid path string true "Group ID"
-// @Router /v1/groups/{number}/{groupid} [get]
-func (a *Api) GetGroup(c *gin.Context) {
-	number := c.Param("number")
-	groupId := c.Param("groupid")
+func (a *Api) GetGroup(ctx context.Context, in *pb.GroupRequest) (*pb.GetGroupResponse, error) {
+	if in.Number == "" {
+		return nil, status.Error(codes.InvalidArgument, "Please provide a number")
+	}
 
-	groupEntry, err := a.signalClient.GetGroup(number, groupId)
+	if in.Groupid == "" {
+		return nil, status.Error(codes.InvalidArgument, "Please provide a group id")
+	}
+
+	group, err := a.signalClient.GetGroup(in.Number, in.Groupid)
 	if err != nil {
-		c.JSON(400, Error{Msg: err.Error()})
-		return
+		return nil, status.Error(codes.Unknown, err.Error())
 	}
 
-	if groupEntry != nil {
-		c.JSON(200, groupEntry)
-	} else {
-		c.JSON(404, Error{Msg: "No group with that id found"})
+	if group == nil {
+		return nil, status.Error(codes.NotFound, "Group not found")
 	}
+
+	return &pb.GetGroupResponse{
+		Name:            group.Name,
+		Id:              group.Id,
+		InternalId:      group.InternalId,
+		Members:         group.Members,
+		Blocked:         group.Blocked,
+		PendingInvites:  group.PendingInvites,
+		PendingRequests: group.PendingRequests,
+		InviteLink:      group.InviteLink,
+	}, nil
 }
 
-// @Summary Delete a Signal Group.
-// @Tags Groups
-// @Description Delete the specified Signal Group.
-// @Accept  json
-// @Produce  json
-// @Success 200 {string} string "OK"
-// @Failure 400 {object} Error
-// @Param number path string true "Registered Phone Number"
-// @Param groupid path string true "Group Id"
-// @Router /v1/groups/{number}/{groupid} [delete]
-func (a *Api) DeleteGroup(c *gin.Context) {
-	base64EncodedGroupId := c.Param("groupid")
-	number := c.Param("number")
-
-	if base64EncodedGroupId == "" {
-		c.JSON(400, Error{Msg: "Please specify a group id"})
-		return
+func (a *Api) DeleteGroup(ctx context.Context, in *pb.GroupRequest) (*empty.Empty, error) {
+	if in.Number == "" {
+		return nil, status.Error(codes.InvalidArgument, "Please provide a number")
 	}
 
-	groupId, err := client.ConvertGroupIdToInternalGroupId(base64EncodedGroupId)
+	if in.Groupid == "" {
+		return nil, status.Error(codes.InvalidArgument, "Please provide a group id")
+	}
+
+	groupId, err := client.ConvertGroupIdToInternalGroupId(in.Groupid)
 	if err != nil {
-		c.JSON(400, Error{Msg: err.Error()})
-		return
+		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	err = a.signalClient.DeleteGroup(number, groupId)
+	err = a.signalClient.DeleteGroup(in.Number, groupId)
 	if err != nil {
-		c.JSON(400, Error{Msg: err.Error()})
-		return
+		return nil, status.Error(codes.Unknown, err.Error())
 	}
+
+	return &empty.Empty{}, nil
 }
 
-// @Summary Link device and generate QR code.
-// @Tags Devices
-// @Description Link device and generate QR code
-// @Produce  json
-// @Success 200 {string} string	"Image"
-// @Param device_name query string true "Device Name"
-// @Failure 400 {object} Error
-// @Router /v1/qrcodelink [get]
-func (a *Api) GetQrCodeLink(c *gin.Context) {
-	deviceName := c.Query("device_name")
-
-	if deviceName == "" {
-		c.JSON(400, Error{Msg: "Please provide a name for the device"})
-		return
+func (a *Api) GetQrCodeLink(ctx context.Context, in *pb.GetQrCodeLinkRequest) (*pb.GetQrCodeLinkResponse, error) {
+	if in.DeviceName == "" {
+		return nil, status.Error(codes.InvalidArgument, "Please provide a name for the device")
 	}
 
-	png, err := a.signalClient.GetQrCodeLink(deviceName)
+	png, err := a.signalClient.GetQrCodeLink(in.DeviceName)
 	if err != nil {
-		c.JSON(400, Error{Msg: err.Error()})
-		return
+		return nil, status.Error(codes.Unknown, err.Error())
 	}
 
-	c.Data(200, "image/png", png)
+	return &pb.GetQrCodeLinkResponse{
+		Image: png,
+	}, nil
 }
 
-// @Summary List all attachments.
-// @Tags Attachments
-// @Description List all downloaded attachments
-// @Produce  json
-// @Success 200 {object} []string
-// @Failure 400 {object} Error
-// @Router /v1/attachments [get]
-func (a *Api) GetAttachments(c *gin.Context) {
+func (a *Api) GetAttachments(ctx context.Context, _ *empty.Empty) (*pb.GetAttachmentsResponse, error) {
 	files, err := a.signalClient.GetAttachments()
 	if err != nil {
-		c.JSON(500, Error{Msg: "Couldn't get list of attachments: " + err.Error()})
-		return
+		return nil, status.Error(codes.Unknown, err.Error())
 	}
 
-	c.JSON(200, files)
+	return &pb.GetAttachmentsResponse{
+		Attachments: files,
+	}, nil
 }
 
-// @Summary Remove attachment.
-// @Tags Attachments
-// @Description Remove the attachment with the given id from filesystem.
-// @Produce  json
-// @Success 204 {string} OK
-// @Failure 400 {object} Error
-// @Param attachment path string true "Attachment ID"
-// @Router /v1/attachments/{attachment} [delete]
-func (a *Api) RemoveAttachment(c *gin.Context) {
-	attachment := c.Param("attachment")
+func (a *Api) RemoveAttachment(ctx context.Context, in *pb.RemoveAttachmentRequest) (*empty.Empty, error) {
+	err := a.signalClient.RemoveAttachment(in.Attachment)
 
-	err := a.signalClient.RemoveAttachment(attachment)
 	if err != nil {
 		switch err.(type) {
-			case *client.InvalidNameError:
-				c.JSON(400, Error{Msg: err.Error()})
-				return
-			case *client.NotFoundError:
-				c.JSON(404, Error{Msg: err.Error()})
-				return
-			case *client.InternalError:
-				c.JSON(500, Error{Msg: err.Error()})
-				return
-			default:
-				c.JSON(500, Error{Msg: err.Error()})
-				return
+		case *client.InvalidNameError:
+			return nil, status.Error(codes.InvalidArgument, err.Error())
+		case *client.NotFoundError:
+			return nil, status.Error(codes.NotFound, err.Error())
+		case *client.InternalError:
+			return nil, status.Error(codes.Internal, err.Error())
+		default:
+			return nil, status.Error(codes.Unknown, err.Error())
+		}
+	}
+	return &empty.Empty{}, nil
+}
+
+func (a *Api) ServeAttachment(ctx context.Context, in *pb.ServeAttachmentRequest) (*pb.ServeAttachmentResponse, error) {
+	attachmentBytes, err := a.signalClient.GetAttachment(in.Attachment)
+
+	if err != nil {
+		switch err.(type) {
+		case *client.InvalidNameError:
+			return nil, status.Error(codes.InvalidArgument, err.Error())
+		case *client.NotFoundError:
+			return nil, status.Error(codes.NotFound, err.Error())
+		case *client.InternalError:
+			return nil, status.Error(codes.Internal, err.Error())
+		default:
+			return nil, status.Error(codes.Unknown, err.Error())
 		}
 	}
 
-	c.Status(http.StatusNoContent)
+	return &pb.ServeAttachmentResponse{
+		Attachment: attachmentBytes,
+	}, nil
 }
 
-// @Summary Serve Attachment.
-// @Tags Attachments
-// @Description Serve the attachment with the given id
-// @Produce  json
-// @Success 200 {string} OK
-// @Failure 400 {object} Error
-// @Param attachment path string true "Attachment ID"
-// @Router /v1/attachments/{attachment} [get]
-func (a *Api) ServeAttachment(c *gin.Context) {
-	attachment := c.Param("attachment")
-
-	attachmentBytes, err := a.signalClient.GetAttachment(attachment)
-	if err != nil {
-		switch err.(type) {
-			case *client.InvalidNameError:
-				c.JSON(400, Error{Msg: err.Error()})
-				return
-			case *client.NotFoundError:
-				c.JSON(404, Error{Msg: err.Error()})
-				return
-			case *client.InternalError:
-				c.JSON(500, Error{Msg: err.Error()})
-				return
-			default:
-				c.JSON(500, Error{Msg: err.Error()})
-				return
-		}
+func (a *Api) UpdateProfile(ctx context.Context, in *pb.UpdateProfileRequest) (*empty.Empty, error) {
+	if in.Number == "" {
+		return nil, status.Error(codes.InvalidArgument, "Please provide a number")
 	}
 
-	mime, err := mimetype.DetectReader(bytes.NewReader(attachmentBytes))
-	if err != nil {
-		c.JSON(500, Error{Msg: "Couldn't detect MIME type for attachment"})
-		return
+	if in.Name == "" {
+		return nil, status.Error(codes.InvalidArgument, "Please provide a profile name")
 	}
 
-	c.Writer.Header().Set("Content-Type", mime.String())
-	c.Writer.Header().Set("Content-Length", strconv.Itoa(len(attachmentBytes)))
-	_, err = c.Writer.Write(attachmentBytes)
+	err := a.signalClient.UpdateProfile(in.Number, in.Name, in.Base64Avatar)
 	if err != nil {
-		c.JSON(500, Error{Msg: "Couldn't serve attachment - please try again later"})
-		return
+		return nil, status.Error(codes.Unknown, err.Error())
 	}
+
+	return &empty.Empty{}, nil
 }
 
-// @Summary Update Profile.
-// @Tags Profiles
-// @Description Set your name and optional an avatar.
-// @Produce  json
-// @Success 204 {string} OK
-// @Failure 400 {object} Error
-// @Param data body UpdateProfileRequest true "Profile Data"
-// @Param number path string true "Registered Phone Number"
-// @Router /v1/profiles/{number} [put]
-func (a *Api) UpdateProfile(c *gin.Context) {
-	number := c.Param("number")
-
-	if number == "" {
-		c.JSON(400, Error{Msg: "Couldn't process request - number missing"})
-		return
-	}
-
-	var req UpdateProfileRequest
-	err := c.BindJSON(&req)
-	if err != nil {
-		c.JSON(400, Error{Msg: "Couldn't process request - invalid request"})
-		log.Error(err.Error())
-		return
-	}
-
-	if req.Name == "" {
-		c.JSON(400, Error{Msg: "Couldn't process request - profile name missing"})
-		return
-	}
-
-	err = a.signalClient.UpdateProfile(number, req.Name, req.Base64Avatar)
-	if err != nil {
-		c.JSON(400, Error{Msg: err.Error()})
-		return
-	}
-
-	c.Status(http.StatusNoContent)
+func (a *Api) Health(ctx context.Context, _ *empty.Empty) (*empty.Empty, error) {
+	return &empty.Empty{}, nil
 }
 
-// @Summary API Health Check
-// @Tags General
-// @Description Internally used by the docker container to perform the health check.
-// @Produce  json
-// @Success 204 {string} OK
-// @Router /v1/health [get]
-func (a *Api) Health(c *gin.Context) {
-	c.Status(http.StatusNoContent)
+func (a *Api) ListIdentities(ctx context.Context, in *pb.ListIdentitiesRequest) (*pb.ListIdentitiesResponse, error) {
+	if in.Number == "" {
+		return nil, status.Error(codes.InvalidArgument, "Please provide a number")
+	}
+
+	identities, err := a.signalClient.ListIdentities(in.Number)
+	if err != nil {
+		return nil, status.Error(codes.Unknown, err.Error())
+	}
+
+	grpc_identities := []*pb.ListIdentitiesResponse_ListIdentityResponse{}
+	for _, identity := range *identities {
+		grpc_identities = append(grpc_identities, &pb.ListIdentitiesResponse_ListIdentityResponse{
+			Added:        identity.Added,
+			Fingerprint:  identity.Fingerprint,
+			Number:       identity.Number,
+			SafetyNumber: identity.SafetyNumber,
+			Status:       identity.Status,
+		})
+	}
+
+	return &pb.ListIdentitiesResponse{
+		Identities: grpc_identities,
+	}, nil
 }
 
-// @Summary List Identities
-// @Tags Identities
-// @Description List all identities for the given number.
-// @Produce  json
-// @Success 200 {object} []client.IdentityEntry
-// @Param number path string true "Registered Phone Number"
-// @Router /v1/identities/{number} [get]
-func (a *Api) ListIdentities(c *gin.Context) {
-	number := c.Param("number")
-
-	if number == "" {
-		c.JSON(400, Error{Msg: "Couldn't process request - number missing"})
-		return
+func (a *Api) TrustIdentity(ctx context.Context, in *pb.TrustIdentityRequest) (*empty.Empty, error) {
+	if in.Number == "" {
+		return nil, status.Error(codes.InvalidArgument, "Please provide a number")
 	}
 
-	identityEntries, err := a.signalClient.ListIdentities(number)
+	if in.NumberToTrust == "" {
+		return nil, status.Error(codes.InvalidArgument, "Please provide a number to trust")
+	}
+
+	if in.VerifiedSafetyNumber == "" {
+		return nil, status.Error(codes.InvalidArgument, "Please provide a verified safety number")
+	}
+
+	err := a.signalClient.TrustIdentity(in.Number, in.NumberToTrust, in.VerifiedSafetyNumber)
 	if err != nil {
-		c.JSON(500, Error{Msg: err.Error()})
-		return
+		return nil, status.Error(codes.Unknown, err.Error())
 	}
 
-	c.JSON(200, identityEntries)
+	return &empty.Empty{}, nil
 }
 
-// @Summary Trust Identity
-// @Tags Identities
-// @Description Trust an identity.
-// @Produce  json
-// @Success 204 {string} OK
-// @Param data body TrustIdentityRequest true "Input Data"
-// @Param number path string true "Registered Phone Number"
-// @Param numberToTrust path string true "Number To Trust"
-// @Router /v1/identities/{number}/trust/{numberToTrust} [put]
-func (a *Api) TrustIdentity(c *gin.Context) {
-	number := c.Param("number")
-
-	if number == "" {
-		c.JSON(400, Error{Msg: "Couldn't process request - number missing"})
-		return
-	}
-
-	numberToTrust := c.Param("numbertotrust")
-	if numberToTrust == "" {
-		c.JSON(400, Error{Msg: "Couldn't process request - number to trust missing"})
-		return
-	}
-
-	var req TrustIdentityRequest
-	err := c.BindJSON(&req)
-	if err != nil {
-		c.JSON(400, Error{Msg: "Couldn't process request - invalid request"})
-		log.Error(err.Error())
-		return
-	}
-
-	if req.VerifiedSafetyNumber == "" {
-		c.JSON(400, Error{Msg: "Couldn't process request - verified safety number missing"})
-		return
-	}
-
-	err = a.signalClient.TrustIdentity(number, numberToTrust, req.VerifiedSafetyNumber)
-	if err != nil {
-		c.JSON(400, Error{Msg: err.Error()})
-		return
-	}
-
-	c.Status(http.StatusNoContent)
-}
-
-// @Summary Set the REST API configuration.
-// @Tags General
-// @Description Set the REST API configuration.
-// @Accept  json
-// @Produce  json
-// @Success 201 {string} string "OK"
-// @Failure 400 {object} Error
-// @Param data body Configuration true "Configuration"
-// @Router /v1/configuration [post]
-func (a *Api) SetConfiguration(c *gin.Context) {
-	var req Configuration
-	err := c.BindJSON(&req)
-	if err != nil {
-		c.JSON(400, Error{Msg: "Couldn't process request - invalid request"})
-		log.Error(err.Error())
-		return
-	}
-
-	if req.Logging.Level != "" {
-		if req.Logging.Level == "debug" {
+func (a *Api) SetConfiguration(ctx context.Context, in *pb.SetConfigurationRequest) (*empty.Empty, error) {
+	if in.Logging.Level != "" {
+		if in.Logging.Level == "debug" {
 			log.SetLevel(log.DebugLevel)
-		} else if req.Logging.Level == "info" {
+		} else if in.Logging.Level == "info" {
 			log.SetLevel(log.InfoLevel)
-		} else if req.Logging.Level == "warn" {
+		} else if in.Logging.Level == "warn" {
 			log.SetLevel(log.WarnLevel)
 		} else {
-			c.JSON(400, Error{Msg: "Couldn't set log level - invalid log level"})
-			return
+			return nil, status.Error(codes.InvalidArgument, "Couldn't set log level - invalid log level")
 		}
 	}
-	c.Status(http.StatusNoContent)
+
+	return &empty.Empty{}, nil
 }
 
-// @Summary List the REST API configuration.
-// @Tags General
-// @Description List the REST API configuration.
-// @Accept  json
-// @Produce  json
-// @Success 200 {object} Configuration
-// @Failure 400 {object} Error
-// @Router /v1/configuration [get]
-func (a *Api) GetConfiguration(c *gin.Context) {
+func (a *Api) GetConfiguration(ctx context.Context, _ *empty.Empty) (*pb.GetConfigurationResponse, error) {
 	logLevel := ""
 	if log.GetLevel() == log.DebugLevel {
 		logLevel = "debug"
@@ -784,104 +399,60 @@ func (a *Api) GetConfiguration(c *gin.Context) {
 		logLevel = "warn"
 	}
 
-	configuration := Configuration{Logging: LoggingConfiguration{Level: logLevel}}
-	c.JSON(200, configuration)
+	return &pb.GetConfigurationResponse{
+		Logging: &pb.Logging{
+			Level: logLevel,
+		},
+	}, nil
 }
 
-// @Summary Block a Signal Group.
-// @Tags Groups
-// @Description Block the specified Signal Group.
-// @Accept  json
-// @Produce  json
-// @Success 200 {string} OK
-// @Failure 400 {object} Error
-// @Param number path string true "Registered Phone Number"
-// @Param groupid path string true "Group ID"
-// @Router /v1/groups/{number}/{groupid}/block [post]
-func (a *Api) BlockGroup(c *gin.Context) {
-	number := c.Param("number")
-	if number == "" {
-		c.JSON(400, Error{Msg: "Couldn't process request - number missing"})
-		return
+func (a *Api) BlockGroup(ctx context.Context, in *pb.GroupRequest) (*empty.Empty, error) {
+	if in.Number == "" {
+		return nil, status.Error(codes.InvalidArgument, "Please provide a number")
 	}
 
-	groupId := c.Param("groupid")
-	internalGroupId, err := client.ConvertGroupIdToInternalGroupId(groupId)
+	if in.Groupid == "" {
+		return nil, status.Error(codes.InvalidArgument, "Please provide a group id")
+	}
+
+	err := a.signalClient.BlockGroup(in.Number, in.Groupid)
 	if err != nil {
-		c.JSON(400, Error{Msg: err.Error()})
-		return
+		return nil, status.Error(codes.Unknown, err.Error())
 	}
 
-	err = a.signalClient.BlockGroup(number, internalGroupId)
-	if err != nil {
-		c.JSON(400, Error{Msg: err.Error()})
-		return
-	}
-
-	c.Status(http.StatusNoContent)
+	return &empty.Empty{}, nil
 }
 
-// @Summary Join a Signal Group.
-// @Tags Groups
-// @Description Join the specified Signal Group.
-// @Accept  json
-// @Produce  json
-// @Success 200 {string} OK
-// @Failure 400 {object} Error
-// @Param number path string true "Registered Phone Number"
-// @Param groupid path string true "Group ID"
-// @Router /v1/groups/{number}/{groupid}/join [post]
-func (a *Api) JoinGroup(c *gin.Context) {
-	number := c.Param("number")
-	if number == "" {
-		c.JSON(400, Error{Msg: "Couldn't process request - number missing"})
-		return
+func (a *Api) JoinGroup(ctx context.Context, in *pb.GroupRequest) (*empty.Empty, error) {
+	if in.Number == "" {
+		return nil, status.Error(codes.InvalidArgument, "Please provide a number")
 	}
 
-	groupId := c.Param("groupid")
-	internalGroupId, err := client.ConvertGroupIdToInternalGroupId(groupId)
+	if in.Groupid == "" {
+		return nil, status.Error(codes.InvalidArgument, "Please provide a group id")
+	}
+
+	err := a.signalClient.JoinGroup(in.Number, in.Groupid)
 	if err != nil {
-		c.JSON(400, Error{Msg: err.Error()})
-		return
+		return nil, status.Error(codes.Unknown, err.Error())
 	}
 
-	err = a.signalClient.JoinGroup(number, internalGroupId)
-	if err != nil {
-		c.JSON(400, Error{Msg: err.Error()})
-		return
-	}
-
-	c.Status(http.StatusNoContent)
+	return &empty.Empty{}, nil
 }
 
-// @Summary Quit a Signal Group.
-// @Tags Groups
-// @Description Quit the specified Signal Group.
-// @Accept  json
-// @Produce  json
-// @Success 200 {string} OK
-// @Failure 400 {object} Error
-// @Param number path string true "Registered Phone Number"
-// @Param groupid path string true "Group ID"
-// @Router /v1/groups/{number}/{groupid}/quit [post]
-func (a *Api) QuitGroup(c *gin.Context) {
-	number := c.Param("number")
-	if number == "" {
-		c.JSON(400, Error{Msg: "Couldn't process request - number missing"})
-		return
+func (a *Api) QuitGroup(ctx context.Context, in *pb.GroupRequest) (*empty.Empty, error) {
+	if in.Number == "" {
+		return nil, status.Error(codes.InvalidArgument, "Please provide a number")
 	}
 
-	groupId := c.Param("groupid")
-	internalGroupId, err := client.ConvertGroupIdToInternalGroupId(groupId)
-	if err != nil {
-		c.JSON(400, Error{Msg: err.Error()})
-		return
+	if in.Groupid == "" {
+		return nil, status.Error(codes.InvalidArgument, "Please provide a group id")
 	}
 
-	err = a.signalClient.QuitGroup(number, internalGroupId)
+	err := a.signalClient.QuitGroup(in.Number, in.Groupid)
 	if err != nil {
-		c.JSON(400, Error{Msg: err.Error()})
-		return
+		return nil, status.Error(codes.Unknown, err.Error())
 	}
-	c.Status(http.StatusNoContent)
+
+	return &empty.Empty{}, nil
 }

@@ -1,0 +1,193 @@
+syntax = "proto3";
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/empty.proto";
+
+option go_package = "github.com/datti-to/signal-cli-grpc-api/proto";
+//protoc --go_out=. --go_opt=paths=source_relative --go-grpc_out=. --go-grpc_opt=paths=source_relative proto/signal.proto
+service SignalService {
+    rpc About(google.protobuf.Empty) returns (AboutResponse) {}
+    rpc GetConfiguration(google.protobuf.Empty) returns (GetConfigurationResponse) {}
+    rpc SetConfiguration(SetConfigurationRequest) returns (google.protobuf.Empty) {}
+    rpc Health(google.protobuf.Empty) returns (google.protobuf.Empty) {}
+    rpc RegisterNumber(RegisterNumberRequest) returns (google.protobuf.Empty) {}
+    rpc VerifyRegisteredNumber(VerifyRegisteredNumberRequest) returns (google.protobuf.Empty) {}
+    rpc Send(SendRequest) returns (SendResponse) {}
+    rpc Receive(ReceiveRequest) returns (ReceiveResponse) {}
+    rpc CreateGroup(CreateGroupRequest) returns (CreateGroupResponse) {}
+    rpc GetGroups(GetGroupsRequest) returns (GetGroupsResponse) {}
+    rpc GetGroup(GroupRequest) returns (GetGroupResponse) {}
+    rpc DeleteGroup(GroupRequest) returns (google.protobuf.Empty) {}
+    rpc JoinGroup(GroupRequest) returns (google.protobuf.Empty) {}
+    rpc BlockGroup(GroupRequest) returns (google.protobuf.Empty) {}
+    rpc GetQrCodeLink(GetQrCodeLinkRequest) returns (GetQrCodeLinkResponse) {}
+    rpc GetAttachments(google.protobuf.Empty) returns (GetAttachmentsResponse) {}
+    rpc RemoveAttachment(RemoveAttachmentRequest) returns (google.protobuf.Empty) {}
+    rpc ServeAttachment(ServeAttachmentRequest) returns (ServeAttachmentResponse) {}
+    rpc UpdateProfile(UpdateProfileRequest) returns (google.protobuf.Empty) {}
+    rpc ListIdentities(ListIdentitiesRequest) returns (ListIdentitiesResponse) {}
+    rpc TrustIdentity(TrustIdentityRequest) returns (google.protobuf.Empty) {}
+    rpc SendV2(SendV2Request) returns (SendResponse) {}
+}
+
+message AboutResponse {
+    int32 build = 1;
+    repeated string supported_api_versions = 2;
+}
+
+message Logging {
+    string Level = 1;
+}
+
+message GetConfigurationResponse {
+    Logging logging = 1;
+}
+
+message SetConfigurationRequest {
+    Logging logging = 1;
+}
+
+message RegisterNumberRequest {
+    string number = 1;
+    string captcha = 2;
+    bool use_voice = 3;
+}
+
+message VerifyRegisteredNumberRequest {
+    string number = 1;
+    string token = 2;
+    string pin = 3;
+}
+
+message SendRequest {
+    string base64_attachment = 1;
+    bool is_group = 2;
+    string message = 3;
+    string number = 4;
+    repeated string recipients = 5;
+}
+
+message ReceiveRequest {
+    string number = 1;
+    int32 timeout = 2;
+}
+
+message ReceiveResponse {
+    repeated string messages = 1;
+}
+
+message CreateGroupRequest {
+    message GroupPermissions {
+        string add_members = 1;
+        string edit_group = 2;
+    }
+    string number = 1;
+    repeated string members = 2;
+    string name = 3;
+    string description = 4;
+    GroupPermissions permissions = 5;
+    string group_link = 6;
+}
+
+message CreateGroupResponse {
+    string id = 1;
+}
+
+message GetGroupsRequest {
+    string number = 1;
+}
+
+message GetGroupsResponse {
+    repeated GetGroupResponse groups = 1;
+}
+
+message GroupRequest {
+    string number = 1;
+    string groupid = 2;
+}
+
+message GroupActionRequest {
+    string number = 1;
+    string groupid = 2;
+    enum Action {
+        DELETE = 0;
+        BLOCK = 1;
+        JOIN = 2;
+        QUIT = 3;
+    }
+    Action action = 3;
+}
+
+message GetGroupResponse {
+    bool blocked = 1;
+    string id = 2;
+    string internal_id = 3;
+    string invite_link = 4;
+    repeated string members = 5;
+    string name = 6;
+    repeated string pending_invites = 7;
+    repeated string pending_requests = 8;
+}
+
+message GetQrCodeLinkRequest {
+    string device_name = 1;
+}
+
+message GetQrCodeLinkResponse {
+    bytes image = 1;
+}
+
+message GetAttachmentsResponse {
+    repeated string attachments = 1;
+}
+
+message RemoveAttachmentRequest {
+    string attachment = 1;
+}
+
+message ServeAttachmentRequest {
+    string attachment = 1;
+}
+
+message ServeAttachmentResponse {
+    bytes attachment = 1;
+}
+
+message UpdateProfileRequest {
+    string number = 1;
+    string base64_avatar = 2;
+    string name = 3;
+}
+
+message ListIdentitiesRequest {
+    string number = 1;
+}
+
+message ListIdentitiesResponse {
+    message ListIdentityResponse {
+        string added = 1;
+        string fingerprint = 2;
+        string number = 3;
+        string safety_number = 4;
+        string status = 5;
+    }
+
+    repeated ListIdentityResponse identities = 1;
+}
+
+message TrustIdentityRequest {
+    string number = 1;
+    string numberToTrust = 2;
+    string verified_safety_number = 3;
+}
+
+message SendV2Request {
+    string number = 1;
+    string message = 2;
+    repeated string recipients = 3;
+    repeated string base64_attachments = 4;
+}
+
+message SendResponse {
+    google.protobuf.Timestamp timestamp = 1;
+}
