@@ -299,8 +299,6 @@ func (a *Api) ServeAttachment(ctx context.Context, in *pb.ServeAttachmentRequest
 			return nil, status.Error(codes.Unknown, err.Error())
 		}
 	}
-	return &empty.Empty{}, nil
-}
 
 	return &pb.ServeAttachmentResponse{
 		Attachment: attachmentBytes,
