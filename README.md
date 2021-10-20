@@ -1,5 +1,5 @@
 # Dockerized Signal Messenger gRPC API
-This project is forked from [signal-cli-rest-api](https://github.com/datti-to/signal-cli-grpc-api) to create a gRPC based version.
+This project is forked from [signal-cli-rest-api](https://github.com/bbernhard/signal-cli-rest-api) to create a gRPC based version.
 
 This project creates a small dockerized gRPC API around [signal-cli](https://github.com/AsamK/signal-cli).
 
